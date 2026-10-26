@@ -23,13 +23,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 4. **Traffic (Concurrency):** Real-time multiplayer synchronization (Yjs / Supabase Realtime).
 5. **Survival:** Soft deletion (`deleted_at`) across projects, tasks, and diagrams with 1-click Trash & Restore.
 
-## Current State (As of 2026-10-26)
+## Current State (As of 2026-10-27)
 - **App Shell & Layout:** Sidebar with workspace switcher, navigation links, collapsible "Exam Reviewer App", and Home dashboard metrics.
 - **Diagrams Engine (`/projects/[id]/diagrams`):** `@xyflow/react` canvas with 5 custom node types (Process, Decision, Terminal, Note, and DB Table with editable fields), toolbar, minimap, controls, and debounced localStorage autosave.
 - **Work Items Tracker (`/projects/[id]/work-items`):** Linear-style task board with status tabs and counts (All, Backlog, In Progress, Done), global `C` shortcut, native `<dialog>` task modal, and sequential keys (`ERA-1`..`ERA-5`).
+- **Trash & Recovery (`/trash`):** Lists soft-deleted work items and diagrams across projects, with All / Work items / Diagrams filters, text search, and 1-click Restore (sets `deleted_at` to `null` in localStorage). Diagrams appear once a delete action exists; nothing soft-deletes them yet.
 - **Database Schema:** Ready at `supabase/schema.sql` (5 tables: `workspaces`, `workspace_members`, `projects`, `work_items`, `diagrams`).
 
 ## Next Priority Queue
-1. **Trash View (`/trash`):** Display soft-deleted items with 1-click restore.
-2. **Supabase Cloud Connection:** Deploy schema to Supabase, configure `.env.local`, and transition from localStorage to cloud persistence.
+1. **Supabase Cloud Connection & Live Auth:** Deploy schema to Supabase, configure `.env.local`, add live authentication, and transition from localStorage to cloud persistence.
+2. **UI Design / Auto-layout Canvas (`/design`):** Build the design canvas with auto-layout.
 3. **Multiplayer Realtime:** Live collaboration between Marvin and his friend.

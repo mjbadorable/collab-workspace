@@ -1,7 +1,8 @@
 import type { Edge } from "@xyflow/react";
 import type { DiagramNode } from "@/components/diagrams/nodes";
 
-export type StoredDiagram = { nodes: DiagramNode[]; edges: Edge[] };
+// deleted_at mirrors the diagrams table; nothing sets it yet, but the Trash view honours it.
+export type StoredDiagram = { nodes: DiagramNode[]; edges: Edge[]; deleted_at?: string | null };
 
 const storageKey = (projectId: string) => `collab-workspace:diagram:${projectId}`;
 
@@ -29,6 +30,10 @@ export function loadDiagram(projectId: string): StoredDiagram | null {
     // corrupt JSON or storage unavailable: fall back to the default diagram
   }
   return null;
+}
+
+export function restoreDiagram(diagram: StoredDiagram): StoredDiagram {
+  return { ...diagram, deleted_at: null };
 }
 
 export function saveDiagram(projectId: string, diagram: StoredDiagram): void {

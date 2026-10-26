@@ -102,3 +102,7 @@ export function updateWorkItem(items: StoredWorkItem[], id: string, patch: Parti
 export function softDeleteWorkItem(items: StoredWorkItem[], id: string): StoredWorkItem[] {
   return updateWorkItem(items, id, { deleted_at: new Date().toISOString() });
 }
+
+export function restoreWorkItem(items: StoredWorkItem[], id: string): StoredWorkItem[] {
+  return updateWorkItem(items, id, { deleted_at: null });
+}
