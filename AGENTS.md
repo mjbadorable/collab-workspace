@@ -28,9 +28,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - **Diagrams Engine (`/projects/[id]/diagrams`):** `@xyflow/react` canvas with 5 custom node types (Process, Decision, Terminal, Note, and DB Table with editable fields), toolbar, minimap, controls, and debounced localStorage autosave.
 - **Work Items Tracker (`/projects/[id]/work-items`):** Linear-style task board with status tabs and counts (All, Backlog, In Progress, Done), global `C` shortcut, native `<dialog>` task modal, and sequential keys (`ERA-1`..`ERA-5`).
 - **Trash & Recovery (`/trash`):** Lists soft-deleted work items and diagrams across projects, with All / Work items / Diagrams filters, text search, and 1-click Restore (sets `deleted_at` to `null` in localStorage). Diagrams appear once a delete action exists; nothing soft-deletes them yet.
+- **Design (`/design`, `/projects/[id]/designs/[fileId]`):** Design files hub (table, search, "+ New design file" dialog) and a 3-panel canvas editor: Layers tree, pan/zoom canvas rendering flexbox Auto Layout, and a Properties panel (direction, gap, padding, align, distribute, Fixed/Hug sizing, fill) with a "Linked tasks" tab that links layers to work items. Inline text editing on double-click; autosaves to localStorage. Starter file: "Exam Reviewer — Quiz & Bubble Sheet UI". Known gaps: single page, no layer deletion, resize handles are display-only, design files not yet in Trash.
 - **Database Schema:** Ready at `supabase/schema.sql` (5 tables: `workspaces`, `workspace_members`, `projects`, `work_items`, `diagrams`).
 
 ## Next Priority Queue
-1. **Supabase Cloud Connection & Live Auth:** Deploy schema to Supabase, configure `.env.local`, add live authentication, and transition from localStorage to cloud persistence.
-2. **UI Design / Auto-layout Canvas (`/design`):** Build the design canvas with auto-layout.
-3. **Multiplayer Realtime:** Live collaboration between Marvin and his friend.
+- **Final core milestone: Connect Live Supabase Cloud Database & Auth.** Transition from localStorage to PostgreSQL with RLS and realtime sync: deploy `supabase/schema.sql`, configure `.env.local`, add live authentication, move work items, diagrams, and design files to cloud persistence, and enable realtime collaboration (Supabase Realtime).

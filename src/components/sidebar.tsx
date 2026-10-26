@@ -6,15 +6,19 @@ import { useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  Check,
   ChevronsUpDown,
   Home,
   Layers,
+  LogOut,
   Palette,
   Plus,
   Settings,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { useWorkspaces } from "@/lib/workspace-context";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import { initials, mockProjects, mockUser, mockWorkspace, projectLinks } from "@/lib/mock-data";
 
@@ -31,10 +35,15 @@ const itemClass = (active: boolean) =>
     active ? "bg-neutral-200 font-medium text-neutral-900" : "text-neutral-600 hover:bg-neutral-100"
   }`;
 
-export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export default function Sidebar({ onNavigate, onNewWorkspace }: { onNavigate?: () => void; onNewWorkspace: () => void }) {
   const pathname = usePathname();
   const { openDialog } = useNewWorkItem();
   const [open, setOpen] = useState<Record<string, boolean>>({ [mockProjects[0].id]: true });
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const { user, loading, signOut } = useAuth();
+  const { workspaces, current, select } = useWorkspaces();
+  const workspaceName = current?.name ?? mockWorkspace.name;
+  const emailName = user?.email?.split("@")[0] ?? "";
 
   // Project sub-routes live under /projects/..., so "Projects" matches only its own page.
   const isActive = (href: string) => (href === "/" || href === "/projects" ? pathname === href : pathname.startsWith(href));
@@ -42,16 +51,73 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="flex h-full w-64 flex-col border-r border-neutral-200 bg-neutral-50">
       <div className="space-y-2 p-3">
-        <button
-          type="button"
-          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-neutral-100"
-        >
-          <span className="flex h-6 w-6 items-center justify-center rounded bg-indigo-600 text-xs font-semibold text-white">
-            {mockWorkspace.name[0]}
-          </span>
-          <span className="flex-1 truncate text-sm font-medium">{mockWorkspace.name}</span>
-          <ChevronsUpDown className="h-4 w-4 text-neutral-400" />
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={switcherOpen}
+            onClick={() => setSwitcherOpen((o) => !o)}
+            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-neutral-100"
+          >
+            <span className="flex h-6 w-6 items-center justify-center rounded bg-indigo-600 text-xs font-semibold text-white">
+              {workspaceName[0]}
+            </span>
+            <span className="flex-1 truncate text-sm font-medium">{workspaceName}</span>
+            <ChevronsUpDown className="h-4 w-4 text-neutral-400" />
+          </button>
+          {switcherOpen && (
+            <div
+              role="menu"
+              className="absolute inset-x-0 top-full z-10 mt-1 space-y-0.5 rounded-md border border-neutral-200 bg-white p-1 shadow-lg"
+            >
+              {user ? (
+                <>
+                  {workspaces.map((w) => (
+                    <button
+                      key={w.id}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        select(w.id);
+                        setSwitcherOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-neutral-100"
+                    >
+                      <span className="flex-1 truncate">{w.name}</span>
+                      {w.id === current?.id && <Check className="h-4 w-4 text-indigo-600" />}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setSwitcherOpen(false);
+                      onNewWorkspace();
+                    }}
+                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-600 hover:bg-neutral-100"
+                  >
+                    <Plus className="h-4 w-4" /> New workspace
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="px-2 py-1.5 text-xs text-neutral-500">Local preview workspace</p>
+                  <Link
+                    href="/login"
+                    role="menuitem"
+                    onClick={() => {
+                      setSwitcherOpen(false);
+                      onNavigate?.();
+                    }}
+                    className="block rounded px-2 py-1.5 text-sm text-indigo-600 hover:bg-neutral-100"
+                  >
+                    Sign in to use cloud workspaces
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         <button
           type="button"
@@ -120,15 +186,34 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       <div className="border-t border-neutral-200 p-3">
-        <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
-            {initials(mockUser.name)}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{mockUser.name}</p>
-            <p className="truncate text-xs text-neutral-500">{mockUser.email}</p>
+        {loading ? (
+          <div className="h-12" aria-hidden />
+        ) : (
+          <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+              {user ? initials(emailName.replace(/[._-]+/g, " ")) || "?" : initials(mockUser.name)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{user ? user.email : mockUser.name}</p>
+              <p className="truncate text-xs text-neutral-500">{user ? "Signed in" : "Local preview"}</p>
+            </div>
+            {user ? (
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                title="Sign out"
+                aria-label="Sign out"
+                className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+              >
+                <LogOut className="h-4 w-4" />
+              </button>
+            ) : (
+              <Link href="/login" onClick={onNavigate} className="text-xs font-medium text-indigo-600 hover:underline">
+                Sign in
+              </Link>
+            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

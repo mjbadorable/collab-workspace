@@ -2,7 +2,10 @@
 
 import { Suspense, useState, type ReactNode } from "react";
 import { Menu, X } from "lucide-react";
+import { AuthProvider } from "@/lib/auth-context";
+import { WorkspaceProvider } from "@/lib/workspace-context";
 import Sidebar from "./sidebar";
+import WorkspaceDialog from "./workspace-dialog";
 import { NewWorkItemProvider } from "./work-items/new-work-item-context";
 
 // usePathname() is request-time data on dynamic routes, so the sidebar streams in under Suspense.
@@ -10,14 +13,17 @@ const SidebarFallback = () => <div className="h-full w-64 border-r border-neutra
 
 export default function AppShell({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [workspaceRequested, setWorkspaceRequested] = useState(false);
 
   return (
+    <AuthProvider>
+    <WorkspaceProvider>
     <NewWorkItemProvider>
     <div className="flex h-screen overflow-hidden">
       {/* Desktop: fixed sidebar */}
       <aside className="hidden md:block">
         <Suspense fallback={<SidebarFallback />}>
-          <Sidebar />
+          <Sidebar onNewWorkspace={() => setWorkspaceRequested(true)} />
         </Suspense>
       </aside>
 
@@ -26,7 +32,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <div className="fixed inset-0 z-40 flex md:hidden">
           <div className="relative">
             <Suspense fallback={<SidebarFallback />}>
-              <Sidebar onNavigate={() => setMobileOpen(false)} />
+              <Sidebar
+                onNavigate={() => setMobileOpen(false)}
+                onNewWorkspace={() => {
+                  setMobileOpen(false);
+                  setWorkspaceRequested(true);
+                }}
+              />
             </Suspense>
             <button
               type="button"
@@ -55,6 +67,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
+    <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
     </NewWorkItemProvider>
+    </WorkspaceProvider>
+    </AuthProvider>
   );
 }
