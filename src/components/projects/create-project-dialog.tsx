@@ -1,15 +1,25 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { GitFork, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { ensureCloudProject } from "@/lib/cloud-projects";
+import { normalizeIdentifier, suggestIdentifier } from "@/lib/identifier";
 import { useProjects } from "@/lib/projects-context";
-import { normalizeIdentifier, suggestIdentifier } from "@/lib/projects";
+import { useStorageTarget } from "@/lib/storage-target";
+import { addWorkItem, insertCloudWorkItem, saveWorkItems, type NewWorkItemInput, type StoredWorkItem } from "@/lib/work-items-storage";
 
 const fieldClass =
   "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500";
 
 const iconChoices = ["🙂", "🚀", "📚", "🛠️", "🎮", "📊", "🧪", "🌐"];
+
+type Draft = { title: string; priority: NewWorkItemInput["priority"] };
+
+type Breakdown =
+  | { ok: true; project: { name: string; identifier: string; description: string; live_url: string; github_url: string; icon: string }; workItems: Draft[] }
+  | { ok: false; error: string };
 
 const isHttpUrl = (value: string) => {
   if (!value) return true;
@@ -23,40 +33,109 @@ const isHttpUrl = (value: string) => {
 function CreateForm({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { user } = useAuth();
+  const target = useStorageTarget();
   const { projects, createProject } = useProjects();
   const [name, setName] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [identifierEdited, setIdentifierEdited] = useState(false);
+  const [description, setDescription] = useState("");
+  const [githubUrl, setGithubUrl] = useState("");
+  const [liveUrl, setLiveUrl] = useState("");
   const [icon, setIcon] = useState<string | null>(null);
   const [pickingIcon, setPickingIcon] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // GitHub import
+  const [importUrl, setImportUrl] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [autofilled, setAutofilled] = useState(false);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const latest = useRef(0); // ignores a slow response once a newer analysis has started
 
   const shownIdentifier = identifierEdited ? identifier : suggestIdentifier(name);
   const leadLabel = user?.email ?? "You";
 
-  const submit = (e: FormEvent<HTMLFormElement>) => {
+  const analyze = async (url: string) => {
+    const trimmed = url.trim();
+    if (!trimmed) return setImportError("Paste a GitHub repository URL first.");
+    const run = ++latest.current;
+    setAnalyzing(true);
+    setImportError(null);
+    try {
+      const res = await fetch(`/api/github-breakdown?url=${encodeURIComponent(trimmed)}`);
+      const data: Breakdown = await res.json();
+      if (run !== latest.current) return;
+      if (!data.ok) {
+        setImportError(data.error);
+        return;
+      }
+      const p = data.project;
+      setName(p.name);
+      setIdentifier(normalizeIdentifier(p.identifier));
+      setIdentifierEdited(true);
+      setDescription(p.description);
+      setLiveUrl(p.live_url);
+      setGithubUrl(p.github_url);
+      setIcon(p.icon);
+      setDrafts(data.workItems);
+      setAutofilled(true);
+      setError(null);
+    } catch {
+      if (run === latest.current) setImportError("Could not analyze that repository. Try again, or fill the form manually.");
+    } finally {
+      if (run === latest.current) setAnalyzing(false);
+    }
+  };
+
+  const onImportPaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData("text").trim();
+    if (!pasted) return;
+    setImportUrl(pasted);
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    void analyze(pasted);
+  };
+
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     const id = normalizeIdentifier(shownIdentifier);
-    const github = String(f.get("github") ?? "").trim();
-    const live = String(f.get("live") ?? "").trim();
+    const lead = String(new FormData(e.currentTarget).get("lead") ?? "");
     if (!name.trim()) return setError("Give the project a name.");
     if (!id) return setError("Add an identifier, e.g. SP.");
     if (projects.some((p) => p.identifier === id)) return setError(`The identifier ${id} is already used by another project.`);
-    if (!isHttpUrl(github) || !isHttpUrl(live)) return setError("Repository and live URLs must start with http:// or https://.");
+    if (!isHttpUrl(githubUrl.trim()) || !isHttpUrl(liveUrl.trim())) {
+      return setError("Repository and live URLs must start with http:// or https://.");
+    }
 
-    const lead = String(f.get("lead") ?? "");
+    setSaving(true);
     const project = createProject({
       name,
       identifier: id,
-      description: String(f.get("description") ?? ""),
+      description,
       icon,
       is_public: isPublic,
-      github_url: github,
-      live_url: live,
+      github_url: githubUrl,
+      live_url: liveUrl,
       lead: lead || null,
     });
+
+    // Pre-populate the Kanban board with the tasks discovered in the README.
+    if (drafts.length > 0) {
+      const inputs: NewWorkItemInput[] = drafts.map((d) => ({ title: d.title, description: "", status: "backlog", priority: d.priority }));
+      const seeded = inputs.reduce<StoredWorkItem[]>((items, input) => addWorkItem(items, project.id, input), []);
+      saveWorkItems(project.id, seeded);
+      if (target.mode === "cloud") {
+        try {
+          const uuid = await ensureCloudProject(target.workspaceId, project.id);
+          for (const input of inputs) await insertCloudWorkItem(uuid, input);
+        } catch {
+          // The project and its local items exist; the board's own error banner reports cloud problems.
+        }
+      }
+    }
+
     onClose();
     router.push(`/projects/${project.id}/work-items`);
   };
@@ -64,6 +143,58 @@ function CreateForm({ onClose }: { onClose: () => void }) {
   return (
     <form onSubmit={submit} className="space-y-4 p-5">
       <h2 className="text-base font-semibold">Create project</h2>
+
+      <div className="rounded-lg border border-red-200 bg-red-50/60 p-3">
+        <p className="flex items-center gap-1.5 text-sm font-medium text-red-800">
+          <Sparkles className="h-4 w-4" aria-hidden /> Plug &amp; Play: Import from GitHub
+        </p>
+        <div className="mt-2 flex gap-2">
+          <div className="relative min-w-0 flex-1">
+            <GitFork className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden />
+            <label htmlFor="cp-import" className="sr-only">
+              GitHub repository URL
+            </label>
+            <input
+              id="cp-import"
+              value={importUrl}
+              onChange={(e) => setImportUrl(e.target.value)}
+              onPaste={onImportPaste}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void analyze(importUrl);
+                }
+              }}
+              placeholder="https://github.com/owner/repo"
+              className={`${fieldClass} pl-8`}
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void analyze(importUrl)}
+            disabled={analyzing}
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {analyzing && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {analyzing ? "Analyzing…" : "Analyze & Autofill"}
+          </button>
+        </div>
+        {importError && (
+          <p role="alert" className="mt-2 text-xs text-red-700">
+            {importError}
+          </p>
+        )}
+        {autofilled && !importError && (
+          <div className="mt-2 flex flex-wrap gap-2 text-xs" role="status">
+            <span className="rounded-full border border-red-200 bg-white px-2 py-0.5 font-medium text-red-700">Autofilled from GitHub</span>
+            {drafts.length > 0 && (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">
+                ✓ Discovered {drafts.length} {drafts.length === 1 ? "task" : "tasks"} from README
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="flex items-start gap-3">
         <div className="relative">
@@ -101,7 +232,6 @@ function CreateForm({ onClose }: { onClose: () => void }) {
           <input
             id="cp-name"
             required
-            autoFocus
             maxLength={80}
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -136,8 +266,9 @@ function CreateForm({ onClose }: { onClose: () => void }) {
         </label>
         <textarea
           id="cp-desc"
-          name="description"
           rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           placeholder="What is this project about? (optional)"
           className={fieldClass}
         />
@@ -148,13 +279,27 @@ function CreateForm({ onClose }: { onClose: () => void }) {
           <label htmlFor="cp-github" className="mb-1 block text-xs font-medium text-neutral-600">
             Monitored GitHub repository URL
           </label>
-          <input id="cp-github" name="github" type="url" placeholder="https://github.com/org/repo" className={fieldClass} />
+          <input
+            id="cp-github"
+            type="url"
+            value={githubUrl}
+            onChange={(e) => setGithubUrl(e.target.value)}
+            placeholder="https://github.com/org/repo"
+            className={fieldClass}
+          />
         </div>
         <div>
           <label htmlFor="cp-live" className="mb-1 block text-xs font-medium text-neutral-600">
             Production live URL
           </label>
-          <input id="cp-live" name="live" type="url" placeholder="https://app.example.com" className={fieldClass} />
+          <input
+            id="cp-live"
+            type="url"
+            value={liveUrl}
+            onChange={(e) => setLiveUrl(e.target.value)}
+            placeholder="https://app.example.com"
+            className={fieldClass}
+          />
         </div>
       </div>
 
@@ -190,8 +335,12 @@ function CreateForm({ onClose }: { onClose: () => void }) {
         <button type="button" onClick={onClose} className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100">
           Cancel
         </button>
-        <button type="submit" className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
-          Create project
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
+        >
+          {saving ? "Creating…" : "Create project"}
         </button>
       </div>
     </form>
