@@ -111,7 +111,7 @@ collab-workspace/
 | Key | Title | Status | Priority |
 |---|---|---|---|
 | `CW-1` | Real-time Supabase Realtime channel listener for multi-user Kanban sync | In Progress | High |
-| `CW-2` | Automated GitHub commit and pull request activity widget in project overview | Backlog | Medium |
+| `CW-2` | Automated GitHub commit and pull request activity widget in project overview | Done | Medium |
 | `CW-3` | Workspace-level member role permissions (Admin vs Member granular gates) | Backlog | Medium |
 | `CW-4` | Export project telemetry and architecture blueprint as printable PDF report | Backlog | Low |
 | `CW-5` | Plug & Play GitHub repo breakdown and auto-task generation | Done | High |
