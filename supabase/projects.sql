@@ -6,3 +6,6 @@ alter table public.projects add column if not exists icon        text;
 alter table public.projects add column if not exists is_public   boolean not null default true;
 alter table public.projects add column if not exists github_url  text;
 alter table public.projects add column if not exists live_url    text;
+alter table public.projects add column if not exists functions      text[];
+alter table public.projects add column if not exists frontend_stack text;
+alter table public.projects add column if not exists backend_stack  text;

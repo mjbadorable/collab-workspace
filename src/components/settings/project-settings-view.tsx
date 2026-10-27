@@ -55,7 +55,15 @@ function General({ project }: { project: ProjectRecord }) {
     if (!name) return setError("The project needs a name.");
     if (!isHttpUrl(github_url) || !isHttpUrl(live_url)) return setError("URLs must start with http:// or https://.");
     setError(null);
-    updateProject(project.id, { name, description: String(f.get("description") ?? "").trim(), github_url, live_url });
+    updateProject(project.id, {
+      name,
+      description: String(f.get("description") ?? "").trim(),
+      github_url,
+      live_url,
+      frontend_stack: String(f.get("frontend") ?? "").trim(),
+      backend_stack: String(f.get("backend") ?? "").trim(),
+      functions: String(f.get("functions") ?? "").split("\n").map((l) => l.trim()).filter(Boolean),
+    });
     setSaved(true);
   };
 
@@ -83,6 +91,18 @@ function General({ project }: { project: ProjectRecord }) {
         <div>
           <label htmlFor="ps-live" className="mb-1 block text-xs font-medium text-neutral-600">Production live URL</label>
           <input id="ps-live" name="live" type="url" defaultValue={project.live_url} className={fieldClass} />
+        </div>
+        <div>
+          <label htmlFor="ps-functions" className="mb-1 block text-xs font-medium text-neutral-600">Core functions (one per line)</label>
+          <textarea id="ps-functions" name="functions" rows={4} defaultValue={project.functions.join("\n")} className={fieldClass} />
+        </div>
+        <div>
+          <label htmlFor="ps-frontend" className="mb-1 block text-xs font-medium text-neutral-600">Frontend stack</label>
+          <input id="ps-frontend" name="frontend" defaultValue={project.frontend_stack} placeholder="React 19, Vite 8, Tailwind CSS v4" className={fieldClass} />
+        </div>
+        <div>
+          <label htmlFor="ps-backend" className="mb-1 block text-xs font-medium text-neutral-600">Backend / storage stack</label>
+          <input id="ps-backend" name="backend" defaultValue={project.backend_stack} placeholder="IndexedDB (Dexie.js v4), Service Worker" className={fieldClass} />
         </div>
         {error && <p role="alert" className="rounded-md bg-red-50 px-2.5 py-1.5 text-sm text-red-700">{error}</p>}
         {saved && <p role="status" className="rounded-md bg-emerald-50 px-2.5 py-1.5 text-sm text-emerald-800">Changes saved.</p>}

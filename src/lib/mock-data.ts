@@ -13,15 +13,6 @@ export const mockWorkspace = { name: "DevOps Workspace" };
 
 export const mockProjects: MockProject[] = [{ id: "exam-reviewer-app", name: "Exam Reviewer App", identifier: "ERA" }];
 
-export const projectLinks = [
-  { label: "Work items", slug: "work-items" },
-  { label: "Cycles", slug: "cycles" },
-  { label: "Modules", slug: "modules" },
-  { label: "Dashboards", slug: "dashboards" },
-  { label: "Diagrams", slug: "diagrams" },
-  { label: "Designs", slug: "designs" },
-  { label: "Settings", slug: "settings" },
-] as const;
 
 export const mockStats = { assignedOpen: 0, overdue: 0, completed: 0 };
 

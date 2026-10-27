@@ -29,6 +29,9 @@ export type Project = {
   is_public: boolean;
   github_url: string | null;
   live_url: string | null;
+  functions: string[] | null;
+  frontend_stack: string | null;
+  backend_stack: string | null;
   deleted_at: string | null;
   created_at: string;
 };

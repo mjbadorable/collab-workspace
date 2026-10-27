@@ -18,7 +18,7 @@ const iconChoices = ["🙂", "🚀", "📚", "🛠️", "🎮", "📊", "🧪", 
 type Draft = { title: string; priority: NewWorkItemInput["priority"] };
 
 type Breakdown =
-  | { ok: true; project: { name: string; identifier: string; description: string; live_url: string; github_url: string; icon: string }; workItems: Draft[] }
+  | { ok: true; project: { name: string; identifier: string; description: string; live_url: string; github_url: string; icon: string; functions: string[]; frontend_stack: string; backend_stack: string }; workItems: Draft[] }
   | { ok: false; error: string };
 
 const isHttpUrl = (value: string) => {
@@ -53,6 +53,7 @@ function CreateForm({ onClose }: { onClose: () => void }) {
   const [importError, setImportError] = useState<string | null>(null);
   const [autofilled, setAutofilled] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [stack, setStack] = useState({ functions: [] as string[], frontend_stack: "", backend_stack: "" });
   const latest = useRef(0); // ignores a slow response once a newer analysis has started
 
   const shownIdentifier = identifierEdited ? identifier : suggestIdentifier(name);
@@ -81,6 +82,7 @@ function CreateForm({ onClose }: { onClose: () => void }) {
       setGithubUrl(p.github_url);
       setIcon(p.icon);
       setDrafts(data.workItems);
+      setStack({ functions: p.functions, frontend_stack: p.frontend_stack, backend_stack: p.backend_stack });
       setAutofilled(true);
       setError(null);
     } catch {
@@ -119,6 +121,7 @@ function CreateForm({ onClose }: { onClose: () => void }) {
       github_url: githubUrl,
       live_url: liveUrl,
       lead: lead || null,
+      ...stack,
     });
 
     // Pre-populate the Kanban board with the tasks discovered in the README.
@@ -187,6 +190,9 @@ function CreateForm({ onClose }: { onClose: () => void }) {
         {autofilled && !importError && (
           <div className="mt-2 flex flex-wrap gap-2 text-xs" role="status">
             <span className="rounded-full border border-red-200 bg-white px-2 py-0.5 font-medium text-red-700">Autofilled from GitHub</span>
+            {(stack.frontend_stack || stack.backend_stack) && (
+              <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 font-medium text-neutral-700">✓ Detected tech stack</span>
+            )}
             {drafts.length > 0 && (
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-medium text-emerald-800">
                 ✓ Discovered {drafts.length} {drafts.length === 1 ? "task" : "tasks"} from README

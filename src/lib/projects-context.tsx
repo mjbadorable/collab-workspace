@@ -6,6 +6,7 @@ import CreateProjectDialog from "@/components/projects/create-project-dialog";
 import {
   createLocalProject,
   deleteLocalProject,
+  ensureSeedProjects,
   fetchCloudProjects,
   getProjectDiagrams,
   getProjects,
@@ -52,6 +53,11 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
   const segment = pathname.startsWith("/projects/") ? pathname.split("/")[2] : null;
   const currentProject = segment ? (projects.find((p) => p.id === segment) ?? null) : null;
+
+  // Older saved registries gain the seeded projects (once).
+  useEffect(() => {
+    ensureSeedProjects();
+  }, []);
 
   // Pull projects other devices created in this workspace.
   useEffect(() => {

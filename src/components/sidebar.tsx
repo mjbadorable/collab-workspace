@@ -4,12 +4,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+  BookOpen,
   ChevronDown,
   ChevronRight,
   Check,
   ChevronsUpDown,
   Home,
+  Landmark,
   Layers,
+  ListTodo,
   Network,
   LogOut,
   Palette,
@@ -23,7 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import PokeballIcon from "@/components/pokeball-icon";
-import { initials, mockUser, mockWorkspace, projectLinks } from "@/lib/mock-data";
+import { initials, mockUser, mockWorkspace } from "@/lib/mock-data";
 import { useProjects } from "@/lib/projects-context";
 
 const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
@@ -34,7 +37,17 @@ const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
-const itemClass = (active: boolean) =>
+// The five project sections plus Settings. Cycles, Modules and Dashboards are intentionally not linked.
+const projectNav: { label: string; slug: string; icon: LucideIcon }[] = [
+  { label: "Overview", slug: "", icon: BookOpen },
+  { label: "Work items", slug: "work-items", icon: ListTodo },
+  { label: "System Architecture", slug: "architecture", icon: Landmark },
+  { label: "Flowchart / Diagrams", slug: "diagrams", icon: Network },
+  { label: "Designs", slug: "designs", icon: Palette },
+  { label: "Settings", slug: "settings", icon: Settings },
+];
+
+const itemClass =(active: boolean) =>
   `flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
     active ? "bg-neutral-200 font-medium text-neutral-900" : "text-neutral-600 hover:bg-neutral-100"
   }`;
@@ -209,12 +222,14 @@ export default function Sidebar({
                   </button>
                   {expanded && (
                     <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-neutral-200 pl-2">
-                      {projectLinks.map((link) => {
-                        const href = `/projects/${project.id}/${link.slug}`;
+                      {projectNav.map((link) => {
+                        const href = `/projects/${project.id}${link.slug ? `/${link.slug}` : ""}`;
+                        const LinkIcon = link.icon;
                         if (link.slug !== "diagrams") {
                           return (
-                            <li key={link.slug}>
+                            <li key={link.slug || "overview"}>
                               <Link href={href} onClick={onNavigate} className={itemClass(pathname === href)}>
+                                <LinkIcon className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
                                 {link.label}
                               </Link>
                             </li>
@@ -227,6 +242,7 @@ export default function Sidebar({
                           <li key={link.slug}>
                             <div className="flex items-center">
                               <Link href={href} onClick={onNavigate} className={`${itemClass(pathname === href)} flex-1`}>
+                                <LinkIcon className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
                                 {link.label}
                               </Link>
                               <button

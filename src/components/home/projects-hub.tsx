@@ -7,27 +7,9 @@ import { useProjects } from "@/lib/projects-context";
 import type { ProjectRecord } from "@/lib/projects";
 import LiveWorkItems from "./live-work-items";
 import { progressOf } from "./project-card";
-import { healthDot, healthLabel, useHealth } from "./use-health";
+import HealthPill from "./health-pill";
 
 type Tab = "all" | "joined";
-
-function HealthPill({ url }: { url: string }) {
-  const { health } = useHealth(url);
-  return (
-    <span
-      role="status"
-      className="flex max-w-full items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600"
-    >
-      <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
-        {health.state === "online" && (
-          <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${healthDot(health)}`} />
-        )}
-        <span className={`relative inline-flex h-2 w-2 rounded-full ${healthDot(health)}`} />
-      </span>
-      <span className="truncate">{healthLabel(health)}</span>
-    </span>
-  );
-}
 
 function HubCard({ project }: { project: ProjectRecord }) {
   return (
@@ -100,7 +82,7 @@ function HubCard({ project }: { project: ProjectRecord }) {
               <span className="flex-1" />
               <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700">Admin</span>
               <Link
-                href={`/projects/${project.id}/work-items`}
+                href={`/projects/${project.id}`}
                 className="rounded-md bg-red-600 px-2.5 py-1 font-medium text-white hover:bg-red-700"
               >
                 Open

@@ -3,6 +3,7 @@ import { suggestIdentifier } from "@/lib/identifier";
 const TIMEOUT_MS = 8000;
 const MAX_README_CHARS = 200_000;
 const MAX_ITEMS = 5;
+const MAX_FUNCTIONS = 8;
 
 // SSRF guard: the only hosts ever fetched are the two constants below. The user's input is reduced to an
 // owner/repo pair that must match GitHub's naming rules before it is placed in a path.
@@ -86,14 +87,17 @@ function pickIcon(text: string): string {
 
 const TABLE_RULE = /^\s*\|?[\s:|-]+\|?\s*$/; // the |---|---| line under a table header
 
-// Bullets under "Features", "What it does", "TODO"/"Roadmap". Checked boxes ("- [x]") are already done, so skipped.
-function extractWorkItems(readme: string): WorkItemDraft[] {
+const clip = (title: string) => (title.length > 100 ? `${title.slice(0, 97)}…` : title);
+
+// Items under "Features" / "What it does" (capabilities) and "TODO" / "Roadmap" (open work). Bullets and the
+// first cell of table rows both count. Finished roadmap rows and checked boxes ("- [x]") are skipped.
+function scanSections(readme: string): { features: string[]; todos: string[] } {
   const lines = readme.split("\n");
-  const titles: string[] = [];
+  const features: string[] = [];
+  const todos: string[] = [];
   let inSection = false;
   let sectionLevel = 0;
   let isTodo = false;
-  const todoTitles: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -110,32 +114,146 @@ function extractWorkItems(readme: string): WorkItemDraft[] {
       continue;
     }
     if (!inSection) continue;
-    // Markdown tables: the first cell is the item. Header rows (followed by |---|) and finished rows are skipped.
+    const target = isTodo ? todos : features;
+
     if (line.trimStart().startsWith("|")) {
       if (TABLE_RULE.test(line) || TABLE_RULE.test(lines[i + 1] ?? "")) continue;
-      if (/\b(done|completed?|shipped)\b/i.test(line)) continue;
+      if (isTodo && /\b(done|completed?|shipped)\b/i.test(line)) continue;
       const cell = line.split("|")[1] ?? "";
       const title = stripEmoji(stripMarkdown(cell)).replace(/^\d+\.\s*/, "").replace(/[:.]+$/, "");
-      if (title.length >= 3) (isTodo ? todoTitles : titles).push(title.length > 100 ? `${title.slice(0, 97)}…` : title);
+      if (title.length >= 3) target.push(clip(title));
       continue;
     }
+
     const bullet = line.match(/^\s{0,3}(?:[-*+]|\d+\.)\s+(?:\[( |x|X)\]\s+)?(.+)$/);
     if (!bullet) continue;
     if (bullet[1] && bullet[1] !== " ") continue;
     const title = stripEmoji(stripMarkdown(bullet[2])).replace(/[:.]+$/, "");
-    if (title.length < 3) continue;
-    (isTodo ? todoTitles : titles).push(title.length > 100 ? `${title.slice(0, 97)}…` : title);
+    if (title.length >= 3) target.push(clip(title));
   }
+  return { features, todos };
+}
 
+function extractWorkItems(todos: string[], features: string[]): WorkItemDraft[] {
   // Open TODOs first: they are the real backlog.
-  return [...todoTitles, ...titles].slice(0, MAX_ITEMS).map((title, i) => ({
+  return [...todos, ...features].slice(0, MAX_ITEMS).map((title, i) => ({
     title,
     priority: i < 2 ? "high" : i < 4 ? "medium" : "low",
   }));
 }
 
+// ---------------------------------------------------------------- tech stack detection
+
+type Tech = { pkg: string; label: string; versioned?: boolean };
+
+const FRONTEND_DEPS: Tech[] = [
+  { pkg: "next", label: "Next.js", versioned: true },
+  { pkg: "react", label: "React", versioned: true },
+  { pkg: "vue", label: "Vue", versioned: true },
+  { pkg: "svelte", label: "Svelte", versioned: true },
+  { pkg: "@angular/core", label: "Angular", versioned: true },
+  { pkg: "astro", label: "Astro", versioned: true },
+  { pkg: "vite", label: "Vite", versioned: true },
+  { pkg: "typescript", label: "TypeScript" },
+  { pkg: "tailwindcss", label: "Tailwind CSS", versioned: true },
+  { pkg: "zustand", label: "Zustand" },
+  { pkg: "@reduxjs/toolkit", label: "Redux Toolkit" },
+  { pkg: "@tanstack/react-query", label: "TanStack Query" },
+  { pkg: "@xyflow/react", label: "React Flow" },
+  { pkg: "framer-motion", label: "Framer Motion" },
+  { pkg: "pdfjs-dist", label: "PDF.js" },
+];
+
+const BACKEND_DEPS: Tech[] = [
+  { pkg: "dexie", label: "IndexedDB (Dexie.js", versioned: true },
+  { pkg: "@supabase/supabase-js", label: "Supabase" },
+  { pkg: "firebase", label: "Firebase" },
+  { pkg: "express", label: "Express" },
+  { pkg: "fastify", label: "Fastify" },
+  { pkg: "@nestjs/core", label: "NestJS" },
+  { pkg: "prisma", label: "Prisma" },
+  { pkg: "@prisma/client", label: "Prisma" },
+  { pkg: "mongoose", label: "MongoDB (Mongoose)" },
+  { pkg: "pg", label: "PostgreSQL" },
+  { pkg: "drizzle-orm", label: "Drizzle ORM" },
+  { pkg: "xlsx", label: "SheetJS (Excel)" },
+  { pkg: "vitest", label: "Vitest" },
+];
+
+// README mentions catch stacks that have no package.json (or deps pulled from a CDN).
+const README_FRONTEND: [RegExp, string][] = [
+  [/\bnext\.?js\b/i, "Next.js"],
+  [/\breact\b/i, "React"],
+  [/\bvue\b/i, "Vue"],
+  [/\bsvelte\b/i, "Svelte"],
+  [/\bangular\b/i, "Angular"],
+  [/\bvite\b/i, "Vite"],
+  [/\btailwind/i, "Tailwind CSS"],
+  [/\btypescript\b/i, "TypeScript"],
+  [/\bzustand\b/i, "Zustand"],
+  [/\bradix\b/i, "Radix UI"],
+];
+const README_BACKEND: [RegExp, string][] = [
+  [/\bdexie\b/i, "IndexedDB (Dexie.js)"],
+  [/\bindexeddb\b/i, "IndexedDB"],
+  [/\bservice worker\b/i, "Service Worker"],
+  [/\bsupabase\b/i, "Supabase"],
+  [/\bfirebase\b/i, "Firebase"],
+  [/\bnode\.?js\b/i, "Node.js"],
+  [/\bexpress\b/i, "Express"],
+  [/\bpostgres(?:ql)?\b/i, "PostgreSQL"],
+  [/\bsqlite\b/i, "SQLite"],
+  [/\bsheetjs\b/i, "SheetJS (Excel)"],
+  [/\bvitest\b/i, "Vitest"],
+];
+
+const major = (range: string) => range.match(/\d+/)?.[0] ?? "";
+
+function fromPackage(pkgJson: string, techs: Tech[]): string[] {
+  let deps: Record<string, string> = {};
+  try {
+    const parsed = JSON.parse(pkgJson);
+    deps = { ...parsed.dependencies, ...parsed.devDependencies };
+  } catch {
+    return [];
+  }
+  const found: string[] = [];
+  for (const t of techs) {
+    const range = deps[t.pkg];
+    if (!range) continue;
+    const v = t.versioned ? major(range) : "";
+    // Dexie's label opens a parenthesis so the version sits inside it: "IndexedDB (Dexie.js v4)".
+    const label = t.label.endsWith("(Dexie.js") ? `${t.label}${v ? ` v${v}` : ""})` : v ? `${t.label} ${v}` : t.label;
+    if (!found.includes(label)) found.push(label);
+  }
+  return found;
+}
+
+// Adds README-detected names that the package.json pass has not already covered (matched by first word).
+function mergeReadme(found: string[], readme: string, patterns: [RegExp, string][]): string[] {
+  const out = [...found];
+  const key = (s: string) => s.toLowerCase().split(/[\s(]/)[0];
+  for (const [pattern, label] of patterns) {
+    if (!pattern.test(readme)) continue;
+    if (out.some((existing) => key(existing) === key(label) || (key(label) === "indexeddb" && /indexeddb/i.test(existing)))) continue;
+    out.push(label);
+  }
+  return out;
+}
+
 async function fetchWithTimeout(url: string, headers: HeadersInit) {
   return fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(TIMEOUT_MS) });
+}
+
+async function fetchRaw(owner: string, repo: string, branch: string, file: string): Promise<string> {
+  try {
+    const res = await fetchWithTimeout(`${RAW_HOST}/${owner}/${repo}/${encodeURIComponent(branch)}/${file}`, {
+      "User-Agent": "collab-workspace",
+    });
+    return res.ok ? (await res.text()).slice(0, MAX_README_CHARS) : "";
+  } catch {
+    return ""; // a missing file is fine: the repo metadata alone still fills most of the form
+  }
 }
 
 export async function GET(request: Request) {
@@ -159,18 +277,18 @@ export async function GET(request: Request) {
     return fail("Could not reach GitHub. Check your connection and try again.", 502);
   }
 
-  let readme = "";
-  try {
-    const res = await fetchWithTimeout(`${RAW_HOST}/${owner}/${repo}/${encodeURIComponent(meta.default_branch)}/README.md`, {
-      "User-Agent": "collab-workspace",
-    });
-    if (res.ok) readme = (await res.text()).slice(0, MAX_README_CHARS);
-  } catch {
-    // No README is fine: the repo metadata alone still fills most of the form.
-  }
+  const [readme, packageJson] = await Promise.all([
+    fetchRaw(owner, repo, meta.default_branch, "README.md"),
+    fetchRaw(owner, repo, meta.default_branch, "package.json"),
+  ]);
 
   const name = readmeName(readme) ?? prettify(meta.name);
   const description = meta.description?.trim() || readmeDescription(readme) || "";
+  const { features, todos } = scanSections(readme);
+
+  const frontend = mergeReadme(fromPackage(packageJson, FRONTEND_DEPS), readme, README_FRONTEND);
+  const backend = mergeReadme(fromPackage(packageJson, BACKEND_DEPS), readme, README_BACKEND);
+
   const project = {
     name,
     identifier: suggestIdentifier(name),
@@ -178,7 +296,10 @@ export async function GET(request: Request) {
     live_url: findLiveUrl(meta.homepage, readme) ?? "",
     github_url: `https://github.com/${owner}/${repo}`,
     icon: pickIcon(`${meta.name} ${name} ${description} ${(meta.topics ?? []).join(" ")}`),
+    functions: features.slice(0, MAX_FUNCTIONS),
+    frontend_stack: frontend.join(", "),
+    backend_stack: backend.join(", "),
   };
 
-  return Response.json({ ok: true, project, workItems: extractWorkItems(readme) });
+  return Response.json({ ok: true, project, workItems: extractWorkItems(todos, features) });
 }

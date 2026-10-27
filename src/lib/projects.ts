@@ -12,29 +12,73 @@ export type ProjectRecord = {
   is_public: boolean;
   github_url: string;
   live_url: string;
+  functions: string[]; // core capabilities, shown on the Overview
+  frontend_stack: string; // comma-separated, e.g. "React 19, Vite 8, Tailwind CSS v4"
+  backend_stack: string; // comma-separated, e.g. "IndexedDB (Dexie.js v4), Service Worker"
   lead: string | null; // local-only
   created_at: string;
 };
 
 export type ProjectInput = Pick<ProjectRecord, "name" | "identifier"> &
-  Partial<Pick<ProjectRecord, "description" | "icon" | "is_public" | "github_url" | "live_url" | "lead">>;
+  Partial<
+    Pick<
+      ProjectRecord,
+      "description" | "icon" | "is_public" | "github_url" | "live_url" | "lead" | "functions" | "frontend_stack" | "backend_stack"
+    >
+  >;
 
 export const SEED_PROJECT: ProjectRecord = {
   id: "exam-reviewer-app",
   name: "Exam Reviewer App",
   identifier: "ERA",
-  description: "Offline-first exam reviewer with split-screen PDF practice.",
+  description:
+    "An offline-first exam reviewer for people who study from paper exams and PDFs. Read the exam on one side and answer on the other, with no account and no server: everything stays on the device.",
   icon: null,
   is_public: true,
   github_url: "https://github.com/mjbadorable/exam-reviewer-app",
   live_url: "https://exam-reviewer.vercel.app",
+  functions: [
+    "Upload exam PDFs and read them side by side with an answer sheet",
+    "Bubble-sheet mode for practising against paper exams",
+    "Timed mock exams and untimed practice sessions",
+    "Question banks with explanations and topic tags",
+    "Bookmarks, notes and spaced-repetition review",
+    "Backup and restore progress as a file",
+  ],
+  frontend_stack: "React 19, Vite 8, TypeScript, Tailwind CSS v4, Zustand, PDF.js, Lucide",
+  backend_stack: "IndexedDB (Dexie.js v4), Custom Service Worker, Cache Storage API, navigator.storage.persist()",
   lead: null,
   created_at: "2026-10-01T00:00:00.000Z",
 };
 
-export const SEED_PROJECTS: ProjectRecord[] = [SEED_PROJECT];
+export const GRADE_ASSISTANT_PROJECT: ProjectRecord = {
+  id: "mastersoft-grade-encoding-assistant",
+  name: "Mastersoft Grade Encoding Assistant",
+  identifier: "MGEA",
+  description:
+    "A browser-based companion calculator for faculty of the University of San Agustin. It shows teachers exactly what to enter in Mastersoft and exactly what grade Mastersoft will produce, before they encode anything.",
+  icon: "🎓",
+  is_public: true,
+  github_url: "https://github.com/mjbadorable/Mastersoft-Grade-Encoding-Assistant",
+  live_url: "https://mastersoft-grade-assistant.web.app",
+  functions: [
+    "Gradebook per class and section covering Prelim, Midterm and Final",
+    "Computes the exact Total Marks and marks to encode in Mastersoft",
+    "Step-by-step breakdown of how each grade is produced",
+    "Excel import from class records, and Mastersoft import/export files",
+    "Final Rating summary and Final Rating Only mode",
+    "Printable Encoding Guide (PDF or .xlsx) and JSON backup/restore",
+  ],
+  frontend_stack: "React 19, Vite 8, TypeScript, Tailwind CSS v4, Radix UI, Zustand",
+  backend_stack: "IndexedDB (Dexie.js v4), SheetJS (Excel), Service Worker (offline), Vitest",
+  lead: null,
+  created_at: "2026-10-02T00:00:00.000Z",
+};
+
+export const SEED_PROJECTS: ProjectRecord[] = [SEED_PROJECT, GRADE_ASSISTANT_PROJECT];
 
 const KEY = "collab-workspace:projects";
+const SEEDED_FLAG = "collab-workspace:projects-seeded-v2";
 const listeners = new Set<() => void>();
 
 // useSyncExternalStore needs a referentially stable snapshot, so the parsed list is cached per raw string.
@@ -57,12 +101,37 @@ export function getProjects(): ProjectRecord[] {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) cachedList = parsed as ProjectRecord[];
+      if (Array.isArray(parsed)) cachedList = (parsed as Partial<ProjectRecord>[]).map(normalize);
     } catch {
       // corrupt JSON: fall back to the seed
     }
   }
   return cachedList;
+}
+
+// Records saved before the stack fields existed get empty values, or the seed's for the seeded projects.
+function normalize(p: Partial<ProjectRecord>): ProjectRecord {
+  const seed = SEED_PROJECTS.find((s) => s.id === p.id);
+  return {
+    ...(p as ProjectRecord),
+    functions: Array.isArray(p.functions) ? p.functions : (seed?.functions ?? []),
+    frontend_stack: p.frontend_stack ?? seed?.frontend_stack ?? "",
+    backend_stack: p.backend_stack ?? seed?.backend_stack ?? "",
+  };
+}
+
+// One-time: adds the seeded projects an older saved registry doesn't have (e.g. the Grade Assistant).
+export function ensureSeedProjects() {
+  try {
+    if (localStorage.getItem(SEEDED_FLAG)) return;
+    localStorage.setItem(SEEDED_FLAG, "1");
+  } catch {
+    return;
+  }
+  if (readRaw() === null) return;
+  const list = getProjects();
+  const missing = SEED_PROJECTS.filter((s) => !list.some((p) => p.identifier === s.identifier));
+  if (missing.length > 0) write([...list, ...missing]);
 }
 
 export function subscribeProjects(callback: () => void): () => void {
@@ -109,6 +178,9 @@ export function createLocalProject(input: ProjectInput): ProjectRecord {
     github_url: input.github_url?.trim() ?? "",
     live_url: input.live_url?.trim() ?? "",
     lead: input.lead ?? null,
+    functions: input.functions ?? [],
+    frontend_stack: input.frontend_stack?.trim() ?? "",
+    backend_stack: input.backend_stack?.trim() ?? "",
     created_at: new Date().toISOString(),
   };
   write([...list, record]);
@@ -143,6 +215,9 @@ export function mergeRemoteProjects(rows: Project[]) {
       is_public: r.is_public ?? true,
       github_url: r.github_url ?? "",
       live_url: r.live_url ?? "",
+      functions: r.functions ?? [],
+      frontend_stack: r.frontend_stack ?? "",
+      backend_stack: r.backend_stack ?? "",
       lead: null,
       created_at: r.created_at,
     });
@@ -159,6 +234,9 @@ const columns = (p: ProjectRecord) => ({
   is_public: p.is_public,
   github_url: p.github_url || null,
   live_url: p.live_url || null,
+  functions: p.functions,
+  frontend_stack: p.frontend_stack || null,
+  backend_stack: p.backend_stack || null,
 });
 
 function client() {
