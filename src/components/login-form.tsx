@@ -3,7 +3,20 @@
 import { useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Boxes, Hexagon, Lock, Mail, Palette, ShieldCheck, SquareCheckBig, type LucideIcon } from "lucide-react";
+import {
+  Boxes,
+  CheckCircle2,
+  Circle,
+  Eye,
+  EyeOff,
+  Hexagon,
+  Lock,
+  Mail,
+  Palette,
+  ShieldCheck,
+  SquareCheckBig,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 
@@ -42,10 +55,113 @@ const features: { icon: LucideIcon; title: string; body: string }[] = [
   },
 ];
 
+function evaluatePassword(pwd: string) {
+  const hasMinLength = pwd.length >= 8;
+  const hasUpperLower = /[a-z]/.test(pwd) && /[A-Z]/.test(pwd);
+  const hasNumber = /\d/.test(pwd);
+  const hasSymbol = /[^A-Za-z0-9]/.test(pwd);
+  const score = [hasMinLength, hasUpperLower, hasNumber, hasSymbol].filter(Boolean).length;
+  return { hasMinLength, hasUpperLower, hasNumber, hasSymbol, score };
+}
+
+const strengthMeta = [
+  { label: "Too weak", bar: "bg-neutral-200", text: "text-neutral-500" },
+  { label: "Weak", bar: "bg-red-500", text: "text-red-600" },
+  { label: "Fair", bar: "bg-amber-500", text: "text-amber-600" },
+  { label: "Good", bar: "bg-lime-500", text: "text-lime-600" },
+  { label: "Strong", bar: "bg-emerald-500", text: "text-emerald-600" },
+];
+
+function PasswordInput({
+  id,
+  name,
+  value,
+  onChange,
+  shown,
+  onToggle,
+  autoComplete,
+  invalid,
+}: {
+  id: string;
+  name: string;
+  value: string;
+  onChange: (next: string) => void;
+  shown: boolean;
+  onToggle: () => void;
+  autoComplete: string;
+  invalid?: boolean;
+}) {
+  const ToggleIcon = shown ? EyeOff : Eye;
+  return (
+    <div className="relative">
+      <Lock className={iconClass} aria-hidden />
+      <input
+        id={id}
+        name={name}
+        type={shown ? "text" : "password"}
+        required
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        autoComplete={autoComplete}
+        aria-invalid={invalid || undefined}
+        className={`${inputClass} pr-10`}
+      />
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={shown ? "Hide password" : "Show password"}
+        aria-pressed={shown}
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-neutral-400 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+      >
+        <ToggleIcon className="h-4 w-4" aria-hidden />
+      </button>
+    </div>
+  );
+}
+
+function PasswordChecklist({ password }: { password: string }) {
+  const r = evaluatePassword(password);
+  const meta = strengthMeta[password ? r.score : 0];
+  const rules = [
+    { ok: r.hasMinLength, label: "Must have at least 8 characters" },
+    { ok: r.hasUpperLower, label: "Upper & lower case letters" },
+    { ok: r.hasNumber, label: "A number" },
+    { ok: r.hasSymbol, label: "A symbol (@$!%*?&#)" },
+  ];
+  return (
+    <div className="mt-2 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+      <div className="flex gap-1" role="img" aria-label={`Password strength: ${meta.label}`}>
+        {[0, 1, 2, 3].map((i) => (
+          <span
+            key={i}
+            className={`h-1.5 flex-1 rounded-full transition-colors ${i < r.score ? meta.bar : "bg-neutral-200"}`}
+          />
+        ))}
+      </div>
+      <p className={`mt-1.5 text-xs font-medium ${meta.text}`} aria-live="polite">
+        {meta.label}
+      </p>
+      <ul className="mt-2 space-y-1">
+        {rules.map(({ ok, label }) => (
+          <li key={label} className={`flex items-center gap-2 text-xs ${ok ? "text-emerald-700" : "text-neutral-500"}`}>
+            {ok ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" aria-hidden /> : <Circle className="h-3.5 w-3.5 text-neutral-300" aria-hidden />}
+            {label}
+            <span className="sr-only">{ok ? "(met)" : "(not met)"}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function LoginForm() {
   const router = useRouter();
   const { user } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,16 +173,20 @@ export default function LoginForm() {
 
   const switchMode = (next: Mode) => {
     setMode(next);
+    setConfirmPassword("");
     setError(null);
     setNotice(null);
   };
+
+  const mismatch = confirmPassword !== "" && password !== confirmPassword;
+  const signupReady = evaluatePassword(password).score === 4 && password === confirmPassword;
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!supabase) return;
     const f = new FormData(e.currentTarget);
     const email = String(f.get("email") ?? "").trim();
-    const password = String(f.get("password") ?? "");
+    if (mode === "signup" && !signupReady) return;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -172,20 +292,39 @@ export default function LoginForm() {
                     <label htmlFor="auth-password" className="mb-1 block text-xs font-medium text-neutral-600">
                       Password
                     </label>
-                    <div className="relative">
-                      <Lock className={iconClass} aria-hidden />
-                      <input
-                        id="auth-password"
-                        name="password"
-                        type="password"
-                        required
-                        minLength={6}
-                        autoComplete={mode === "signin" ? "current-password" : "new-password"}
-                        className={inputClass}
-                      />
-                    </div>
-                    {mode === "signup" && <p className="mt-1 text-xs text-neutral-500">At least 6 characters.</p>}
+                    <PasswordInput
+                      id="auth-password"
+                      name="password"
+                      value={password}
+                      onChange={setPassword}
+                      shown={showPassword}
+                      onToggle={() => setShowPassword((s) => !s)}
+                      autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                    />
+                    {mode === "signup" && <PasswordChecklist password={password} />}
                   </div>
+                  {mode === "signup" && (
+                    <div>
+                      <label htmlFor="auth-confirm" className="mb-1 block text-xs font-medium text-neutral-600">
+                        Confirm password
+                      </label>
+                      <PasswordInput
+                        id="auth-confirm"
+                        name="confirm"
+                        value={confirmPassword}
+                        onChange={setConfirmPassword}
+                        shown={showConfirmPassword}
+                        onToggle={() => setShowConfirmPassword((s) => !s)}
+                        autoComplete="new-password"
+                        invalid={mismatch}
+                      />
+                      {mismatch && (
+                        <p role="alert" className="mt-1 text-xs text-red-600">
+                          Passwords don&apos;t match.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {error && (
                     <p role="alert" className="rounded-md bg-red-50 px-2.5 py-1.5 text-sm text-red-700">
                       {error}
@@ -198,7 +337,7 @@ export default function LoginForm() {
                   )}
                   <button
                     type="submit"
-                    disabled={busy}
+                    disabled={busy || (mode === "signup" && !signupReady)}
                     className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
                   >
                     {busy ? busyLabel : mode === "signin" ? "Sign in" : "Create account"}
