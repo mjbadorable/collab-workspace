@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronRight, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, Kanban, List, ListChecks, Pencil, Plus, Trash2, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { initials, mockProjects, mockUser } from "@/lib/mock-data";
 import { useStorageTarget } from "@/lib/storage-target";
@@ -19,6 +19,14 @@ import {
 import { useNewWorkItem } from "./new-work-item-context";
 
 type Filter = "all" | WorkItemStatus;
+type ViewMode = "list" | "board";
+
+const VIEW_KEY = "collab-workspace:work-items-view";
+
+const viewOptions: { value: ViewMode; label: string; icon: LucideIcon }[] = [
+  { value: "list", label: "List", icon: List },
+  { value: "board", label: "Board", icon: Kanban },
+];
 
 export const statusOptions: { value: WorkItemStatus; label: string; tone: string }[] = [
   { value: "backlog", label: "Backlog", tone: "border-neutral-200 bg-neutral-100 text-neutral-700" },
@@ -161,6 +169,189 @@ function WorkItemRow({
   );
 }
 
+const columnDot: Record<WorkItemStatus, string> = {
+  backlog: "bg-neutral-400",
+  in_progress: "bg-amber-500",
+  done: "bg-emerald-500",
+};
+
+function BoardCard({
+  item,
+  projectId,
+  me,
+  onChange,
+  onEdit,
+  onDelete,
+}: {
+  item: StoredWorkItem;
+  projectId: string;
+  me: Me;
+  onChange: (patch: Partial<StoredWorkItem>) => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const key = workItemKey(projectId, item.seq);
+  const mine = item.assignee_id === me.id;
+  const priority = priorityOptions.find((p) => p.value === item.priority)!;
+
+  return (
+    <li
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", item.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className="cursor-grab rounded-lg border border-neutral-200 bg-white p-3 shadow-sm active:cursor-grabbing"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-600">{key}</span>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label={`Edit ${key} details`}
+            title="Edit"
+            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onDelete}
+            aria-label={`Move ${key} to trash`}
+            title="Move to trash"
+            className="rounded p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      <button type="button" onClick={onEdit} aria-label={`Edit ${key}`} className="mt-2 block w-full cursor-pointer text-left">
+        <p className={`text-sm font-medium ${item.status === "done" ? "text-neutral-400 line-through" : ""}`}>
+          {item.title}
+        </p>
+        {item.description && <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{item.description}</p>}
+      </button>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span
+          className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${priority.tone}`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${priority.dot}`} aria-hidden />
+          {priority.label}
+        </span>
+        {/* Keyboard / touch alternative to dragging. */}
+        <PillSelect
+          label={`Move ${key} to column`}
+          value={item.status}
+          options={statusOptions}
+          onChange={(status) => onChange({ status })}
+        />
+        <button
+          type="button"
+          onClick={() => onChange({ assignee_id: mine ? null : me.id })}
+          title={mine ? `Assigned to ${me.name} (click to unassign)` : "Unassigned (click to assign to me)"}
+          aria-label={mine ? `Unassign ${key}` : `Assign ${key} to me`}
+          className="ml-auto"
+        >
+          {mine ? (
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700">
+              {initials(me.name)}
+            </span>
+          ) : (
+            <span className="rounded-full border border-dashed border-neutral-300 px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100">
+              Unassigned
+            </span>
+          )}
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function KanbanBoard({
+  items,
+  projectId,
+  me,
+  onChange,
+  onEdit,
+  onDelete,
+  onQuickAdd,
+}: {
+  items: StoredWorkItem[];
+  projectId: string;
+  me: Me;
+  onChange: (id: string, patch: Partial<StoredWorkItem>) => void;
+  onEdit: (item: StoredWorkItem) => void;
+  onDelete: (id: string) => void;
+  onQuickAdd: (status: WorkItemStatus) => void;
+}) {
+  const [dragOver, setDragOver] = useState<WorkItemStatus | null>(null);
+
+  const handleDragOver = (e: DragEvent<HTMLElement>, status: WorkItemStatus) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOver !== status) setDragOver(status);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLElement>, status: WorkItemStatus) => {
+    e.preventDefault();
+    setDragOver(null);
+    const id = e.dataTransfer.getData("text/plain");
+    const item = items.find((i) => i.id === id);
+    if (item && item.status !== status) onChange(id, { status });
+  };
+
+  return (
+    <div className="flex h-full gap-4 overflow-x-auto p-4">
+      {statusOptions.map((col) => {
+        const cards = items.filter((i) => i.status === col.value);
+        return (
+          <section
+            key={col.value}
+            aria-label={col.label}
+            onDragOver={(e) => handleDragOver(e, col.value)}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(null);
+            }}
+            onDrop={(e) => handleDrop(e, col.value)}
+            className={`flex min-w-[280px] flex-1 flex-col rounded-lg border bg-neutral-50 transition-colors ${
+              dragOver === col.value ? "border-indigo-400 bg-indigo-50/60" : "border-neutral-200"
+            }`}
+          >
+            <header className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium">
+              <span className={`h-2 w-2 rounded-full ${columnDot[col.value]}`} aria-hidden />
+              {col.label}
+              <span className="rounded-full bg-white px-1.5 text-xs font-normal text-neutral-500 ring-1 ring-neutral-200">
+                {cards.length}
+              </span>
+            </header>
+            <ul className="flex min-h-16 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
+              {cards.map((item) => (
+                <BoardCard
+                  key={item.id}
+                  item={item}
+                  projectId={projectId}
+                  me={me}
+                  onChange={(patch) => onChange(item.id, patch)}
+                  onEdit={() => onEdit(item)}
+                  onDelete={() => onDelete(item.id)}
+                />
+              ))}
+            </ul>
+            <button
+              type="button"
+              onClick={() => onQuickAdd(col.value)}
+              className="m-2 mt-0 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-neutral-500 hover:bg-neutral-200/60 hover:text-neutral-800"
+            >
+              <Plus className="h-4 w-4" aria-hidden /> Add to {col.label}
+            </button>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 const fieldClass =
   "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
 
@@ -170,6 +361,7 @@ function ItemForm({
   heading,
   submitLabel,
   initial,
+  defaultStatus,
   onSubmit,
   onCancel,
 }: {
@@ -177,6 +369,7 @@ function ItemForm({
   heading: string;
   submitLabel: string;
   initial?: StoredWorkItem;
+  defaultStatus?: WorkItemStatus;
   onSubmit: (input: NewWorkItemInput) => void;
   onCancel: () => void;
 }) {
@@ -230,7 +423,7 @@ function ItemForm({
           <label htmlFor="wi-status" className="mb-1 block text-xs font-medium text-neutral-600">
             Status
           </label>
-          <select id="wi-status" name="status" defaultValue={initial?.status ?? "backlog"} className={fieldClass}>
+          <select id="wi-status" name="status" defaultValue={initial?.status ?? defaultStatus ?? "backlog"} className={fieldClass}>
             {statusOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -279,6 +472,24 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
   const dialogRef = useRef<HTMLDialogElement>(null);
   const editDialogRef = useRef<HTMLDialogElement>(null);
   const [editingItem, setEditingItem] = useState<StoredWorkItem | null>(null);
+  // The board's per-column "Add" buttons pre-select that column's status in the new-item dialog.
+  const [presetStatus, setPresetStatus] = useState<WorkItemStatus>("backlog");
+  // The component only renders on the client (see WorkItemsView), so reading localStorage here is safe.
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === "board" ? "board" : "list";
+    } catch {
+      return "list";
+    }
+  });
+  const chooseView = (next: ViewMode) => {
+    setViewMode(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // storage blocked: the choice just won't persist
+    }
+  };
   // In the cloud, assignees are real auth users; local preview keeps the mock user.
   const me: Me =
     workspaceId && user ? { id: user.id, name: (user.email ?? "Me").split("@")[0].replace(/[._-]+/g, " ") } : mockUser;
@@ -313,13 +524,30 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
           <ChevronRight className="h-3.5 w-3.5 shrink-0" />
           <span className="font-medium text-neutral-900">Work items</span>
         </nav>
-        <button
-          type="button"
-          onClick={openDialog}
-          className="flex shrink-0 items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4" /> New work item
-        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          <div role="group" aria-label="View" className="flex rounded-md bg-neutral-100 p-0.5">
+            {viewOptions.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={viewMode === value}
+                onClick={() => chooseView(value)}
+                className={`flex items-center gap-1.5 rounded px-2.5 py-1 ${
+                  viewMode === value ? "bg-white font-medium shadow-sm" : "text-neutral-600 hover:text-neutral-900"
+                }`}
+              >
+                <Icon className="h-4 w-4" aria-hidden /> {label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={openDialog}
+            className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4" /> New work item
+          </button>
+        </div>
       </header>
 
       {error && (
@@ -328,6 +556,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
         </p>
       )}
 
+      {viewMode === "list" && (
       <div role="tablist" aria-label="Filter by status" className="flex gap-1 border-b border-neutral-200 px-4 py-2">
         {filters.map((f) => {
           const active = filter === f.value;
@@ -350,10 +579,24 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
           );
         })}
       </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {allItems === null ? (
           <p className="px-6 py-16 text-center text-sm text-neutral-500">Loading work items…</p>
+        ) : viewMode === "board" ? (
+          <KanbanBoard
+            items={live}
+            projectId={projectId}
+            me={me}
+            onChange={update}
+            onEdit={setEditingItem}
+            onDelete={softDelete}
+            onQuickAdd={(status) => {
+              setPresetStatus(status);
+              openDialog();
+            }}
+          />
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center px-6 py-16 text-center">
             <ListChecks className="h-8 w-8 text-neutral-400" />
@@ -381,7 +624,10 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
 
       <dialog
         ref={dialogRef}
-        onClose={closeDialog}
+        onClose={() => {
+          closeDialog();
+          setPresetStatus("backlog");
+        }}
         onClick={(e) => e.target === e.currentTarget && closeDialog()}
         aria-label="New work item"
         className="m-auto w-full max-w-md rounded-xl border border-neutral-200 p-0 shadow-xl backdrop:bg-black/30"
@@ -391,6 +637,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             projectKey={projectIdentifier(projectId)}
             heading="New work item"
             submitLabel="Create work item"
+            defaultStatus={presetStatus}
             onCancel={closeDialog}
             onSubmit={(input) => {
               add(input);
