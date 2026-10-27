@@ -1,13 +1,5 @@
-import { Settings } from "lucide-react";
-import PlaceholderView from "@/components/placeholder-view";
+import WorkspaceSettingsView from "@/components/settings/workspace-settings-view";
 
 export default function SettingsPage() {
-  return (
-    <PlaceholderView
-      title="Settings"
-      description="Manage your workspace name, members and roles."
-      icon={Settings}
-      breadcrumbs={[{ label: "Settings" }]}
-    />
-  );
+  return <WorkspaceSettingsView />;
 }

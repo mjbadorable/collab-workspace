@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
+import InviteDialog from "./settings/invite-dialog";
 import Sidebar from "./sidebar";
 import WorkspaceDialog from "./workspace-dialog";
 import { NewWorkItemProvider } from "./work-items/new-work-item-context";
@@ -28,6 +29,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
 function Chrome({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [workspaceRequested, setWorkspaceRequested] = useState(false);
+  const [inviteRequested, setInviteRequested] = useState(false);
   const pathname = usePathname();
 
   // The login page is a full-screen landing page: no sidebar, mobile header or workspace dialog.
@@ -39,7 +41,7 @@ function Chrome({ children }: { children: ReactNode }) {
       {/* Desktop: fixed sidebar */}
       <aside className="hidden md:block">
         <Suspense fallback={<SidebarFallback />}>
-          <Sidebar onNewWorkspace={() => setWorkspaceRequested(true)} />
+          <Sidebar onNewWorkspace={() => setWorkspaceRequested(true)} onInvite={() => setInviteRequested(true)} />
         </Suspense>
       </aside>
 
@@ -53,6 +55,10 @@ function Chrome({ children }: { children: ReactNode }) {
                 onNewWorkspace={() => {
                   setMobileOpen(false);
                   setWorkspaceRequested(true);
+                }}
+                onInvite={() => {
+                  setMobileOpen(false);
+                  setInviteRequested(true);
                 }}
               />
             </Suspense>
@@ -84,6 +90,7 @@ function Chrome({ children }: { children: ReactNode }) {
       </div>
     </div>
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
+    <InviteDialog open={inviteRequested} onClose={() => setInviteRequested(false)} />
     </NewWorkItemProvider>
   );
 }

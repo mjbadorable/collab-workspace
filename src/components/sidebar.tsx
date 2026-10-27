@@ -15,6 +15,7 @@ import {
   Plus,
   Settings,
   Trash2,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -35,7 +36,15 @@ const itemClass = (active: boolean) =>
     active ? "bg-neutral-200 font-medium text-neutral-900" : "text-neutral-600 hover:bg-neutral-100"
   }`;
 
-export default function Sidebar({ onNavigate, onNewWorkspace }: { onNavigate?: () => void; onNewWorkspace: () => void }) {
+export default function Sidebar({
+  onNavigate,
+  onNewWorkspace,
+  onInvite,
+}: {
+  onNavigate?: () => void;
+  onNewWorkspace: () => void;
+  onInvite: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { openDialog } = useNewWorkItem();
@@ -88,6 +97,19 @@ export default function Sidebar({ onNavigate, onNewWorkspace }: { onNavigate?: (
                       {w.id === current?.id && <Check className="h-4 w-4 text-indigo-600" />}
                     </button>
                   ))}
+                  {current && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setSwitcherOpen(false);
+                        onInvite();
+                      }}
+                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-600 hover:bg-neutral-100"
+                    >
+                      <UserPlus className="h-4 w-4" /> Invite members
+                    </button>
+                  )}
                   <button
                     type="button"
                     role="menuitem"

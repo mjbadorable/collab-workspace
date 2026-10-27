@@ -60,6 +60,15 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       create_workspace: { Args: { ws_name: string; ws_slug: string }; Returns: Workspace };
+      // Both are defined in supabase/invite.sql.
+      invite_workspace_member: {
+        Args: { ws_id: string; invite_email: string; member_role: WorkspaceMember["role"] };
+        Returns: undefined;
+      };
+      list_workspace_members: {
+        Args: { ws_id: string };
+        Returns: { user_id: string; email: string; role: WorkspaceMember["role"]; joined_at: string }[];
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
