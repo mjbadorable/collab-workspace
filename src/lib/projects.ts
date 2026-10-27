@@ -75,7 +75,31 @@ export const GRADE_ASSISTANT_PROJECT: ProjectRecord = {
   created_at: "2026-10-02T00:00:00.000Z",
 };
 
-export const SEED_PROJECTS: ProjectRecord[] = [SEED_PROJECT, GRADE_ASSISTANT_PROJECT];
+export const COLLAB_WORKSPACE_PROJECT: ProjectRecord = {
+  id: "collab-workspace",
+  name: "Collab Workspace (DevOps Portal)",
+  identifier: "CW",
+  description:
+    "Collaborative engineering control plane and monitoring dashboard with real-time health checks, plug-and-play GitHub breakdowns, and categorized process flows.",
+  icon: "⚡",
+  is_public: true,
+  github_url: "https://github.com/mjbadorable/collab-workspace",
+  live_url: "https://collab-workspace-mu.vercel.app",
+  functions: [
+    "Multi-project monitoring and control plane with dynamic sidebar trees",
+    "Plug-and-play GitHub repository breakdown with auto-generated tasks and stack detection",
+    "Real-time production health monitoring with latency telemetry and SSRF guards",
+    "Agile work items with 3-column Kanban board, list view, and HTML5 drag-and-drop",
+    "Smart categorized process flow visualizer (User Flow, System Flow, Backend Flow)",
+    "Personalized profile management with Pokémon League titles and photo upload",
+  ],
+  frontend_stack: "Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS v4, React Flow (@xyflow/react), Lucide Icons",
+  backend_stack: "Supabase PostgreSQL, Row-Level Security (RLS), Supabase Auth, Browser LocalStorage Fallback",
+  lead: "Marvin Jhay Adorable",
+  created_at: "2026-10-26T00:00:00.000Z",
+};
+
+export const SEED_PROJECTS: ProjectRecord[] = [SEED_PROJECT, GRADE_ASSISTANT_PROJECT, COLLAB_WORKSPACE_PROJECT];
 
 const KEY = "collab-workspace:projects";
 const SEEDED_FLAG = "collab-workspace:projects-seeded-v2";

@@ -154,6 +154,29 @@ const EXAM_REVIEWER: Record<FlowCategory, Omit<FlowStep, "id">[]> = {
   ],
 };
 
+const COLLAB_WORKSPACE: Record<FlowCategory, Omit<FlowStep, "id">[]> = {
+  user: [
+    step("Sign in or Local Preview", "terminal", "Open the workspace with Supabase or offline preview.", "auth session, local state"),
+    step("Select or Import Project", "process", "Pick an active project or paste any GitHub repo URL.", "project slug, repo metadata"),
+    step("Monitor Production Health", "process", "Real-time latency and HTTP uptime status pings.", "status code, latencyMs"),
+    step("Track Tasks on Kanban Board", "process", "Manage backlog, in-progress, and completed items.", "work item status & priority"),
+    step("Inspect Architectural Flows", "terminal", "Review categorized user, system, and backend flows.", "architecture & Mermaid specs"),
+  ],
+  system: [
+    step("Next.js 16 App Router UI", "terminal", "Server and client components with Turbopack.", "user events & navigation"),
+    step("Zustand & Context Providers", "process", "Reactive state across projects, auth, and tasks.", "in-memory state updates"),
+    step("GitHub Breakdown & Health APIs", "process", "Server-side routes fetching repo data and uptime.", "external API responses"),
+    step("Supabase Realtime & PostgreSQL", "process", "Cloud database with row-level security.", "PostgreSQL records"),
+    step("LocalStorage Fallback Layer", "terminal", "100% offline-first local persistence.", "JSON cached state"),
+  ],
+  backend: [
+    step("Vercel Production Deployment", "terminal", "Continuous deployment triggered by git push on main.", "static assets & edge routes"),
+    step("Supabase Auth & Token Management", "process", "JWT sessions with micro-thumbnail avatar sync.", "access tokens & user metadata"),
+    step("PostgreSQL RLS Protected Schema", "process", "Granular table policies for workspaces and projects.", "workspaces, projects, work_items"),
+    step("SSRF-Protected Health Check Route", "terminal", "Safely queries production URLs without LAN probing.", "HTTPS ping telemetry"),
+  ],
+};
+
 const GRADE_ASSISTANT: Record<FlowCategory, Omit<FlowStep, "id">[]> = {
   user: [
     step("Select Course & Term", "terminal", "Entry point: open a class and choose Prelim, Midterm or Final.", "course, section, term"),
@@ -221,7 +244,13 @@ function genericSteps(project: ProjectRecord, category: FlowCategory): Omit<Flow
 export function getFlow(projectId: string, category: FlowCategory): Flow {
   const project = getProjects().find((p) => p.id === projectId);
   const handWritten =
-    projectId === "exam-reviewer-app" ? EXAM_REVIEWER : projectId === "mastersoft-grade-encoding-assistant" ? GRADE_ASSISTANT : null;
+    projectId === "exam-reviewer-app"
+      ? EXAM_REVIEWER
+      : projectId === "mastersoft-grade-encoding-assistant"
+        ? GRADE_ASSISTANT
+        : projectId === "collab-workspace"
+          ? COLLAB_WORKSPACE
+          : null;
   const steps =
     handWritten?.[category] ??
     genericSteps(project ?? { ...SEED_PROJECT, id: projectId, name: projectId, functions: [], frontend_stack: "", backend_stack: "", live_url: "" }, category);

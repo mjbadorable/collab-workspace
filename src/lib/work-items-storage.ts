@@ -29,8 +29,6 @@ export function workItemKey(projectId: string, seq: number): string {
 }
 
 function seedItems(projectId: string): StoredWorkItem[] {
-  if (projectId !== "exam-reviewer-app") return [];
-
   const seed = (
     seq: number,
     title: string,
@@ -49,6 +47,28 @@ function seedItems(projectId: string): StoredWorkItem[] {
     deleted_at: null,
     created_at: `2026-10-2${seq}T09:00:00.000Z`,
   });
+
+  if (projectId === "collab-workspace") {
+    return [
+      seed(1, "Real-time Supabase Realtime channel listener for multi-user Kanban sync", "in_progress", "high", mockUser.id),
+      seed(2, "Automated GitHub commit and pull request activity widget in project overview", "backlog", "medium", null),
+      seed(3, "Workspace-level member role permissions (Admin vs Member granular gates)", "backlog", "medium", null),
+      seed(4, "Export project telemetry and architecture blueprint as printable PDF report", "backlog", "low", null),
+      seed(5, "Plug & Play GitHub repo breakdown and auto-task generation", "done", "high", mockUser.id),
+    ];
+  }
+
+  if (projectId === "mastersoft-grade-encoding-assistant") {
+    return [
+      seed(1, "Decide TC-009 rule for 74.5–74.9 rounding behavior", "backlog", "high", null),
+      seed(2, "Offline PWA service worker with IndexedDB sync", "done", "high", mockUser.id),
+      seed(3, "Double-rounding simulation & step transmutation table", "done", "high", mockUser.id),
+      seed(4, "Excel and Mastersoft upload template parser", "done", "medium", null),
+      seed(5, "Recruit 3-5 pilot faculty for department trial", "in_progress", "medium", mockUser.id),
+    ];
+  }
+
+  if (projectId !== "exam-reviewer-app") return [];
 
   return [
     seed(1, "Build split-screen PDF viewer with interactive bubble sheet", "in_progress", "high", mockUser.id),
