@@ -50,7 +50,7 @@ function seedItems(projectId: string): StoredWorkItem[] {
 
   if (projectId === "collab-workspace") {
     return [
-      seed(1, "Real-time Supabase Realtime channel listener for multi-user Kanban sync", "in_progress", "high", mockUser.id),
+      seed(1, "Real-time Supabase Realtime channel listener for multi-user Kanban sync", "done", "high", mockUser.id),
       seed(2, "Automated GitHub commit and pull request activity widget in project overview", "done", "medium", mockUser.id),
       seed(3, "Workspace-level member role permissions (Admin vs Member granular gates)", "backlog", "medium", null),
       seed(4, "Export project telemetry and architecture blueprint as printable PDF report", "backlog", "low", null),
@@ -196,20 +196,67 @@ export async function updateCloudWorkItem(id: string, patch: Partial<WorkItem>):
 
 export type WorkItemChange = { type: "INSERT" | "UPDATE" | "DELETE"; row: WorkItem };
 
+export type RealtimeStatus = "connected" | "connecting" | "offline" | "error";
+
+// A teammate currently viewing the board (Supabase Realtime Presence payload).
+export type Viewer = { id: string; name: string; avatar_url: string | null; role: string };
+
+export type WorkItemsSubscription = {
+  onChange: (change: WorkItemChange) => void;
+  onStatus: (status: RealtimeStatus) => void;
+  onPresence: (viewers: Viewer[]) => void;
+};
+
+const isViewer = (value: unknown): value is Viewer =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as Viewer).id === "string" &&
+  typeof (value as Viewer).name === "string";
+
 // Needs the table in the supabase_realtime publication (see supabase/realtime.sql). RLS applies to what is delivered.
-export function subscribeWorkItems(projectUuid: string, onChange: (change: WorkItemChange) => void) {
-  return client()
-    .channel(`work_items_changes:${projectUuid}`)
+// supabase-js reconnects the socket and re-joins the channel by itself (and picks up refreshed auth tokens), so each
+// SUBSCRIBED after the first is a reconnect: presence is re-tracked and the caller is told via onStatus.
+export function subscribeWorkItems(projectUuid: string, viewer: Viewer | null, handlers: WorkItemsSubscription) {
+  const channel = client().channel(`work_items_changes:${projectUuid}`, {
+    config: { presence: { key: viewer?.id ?? `anon-${crypto.randomUUID()}` } },
+  });
+
+  channel
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "work_items", filter: `project_id=eq.${projectUuid}` },
       (payload) => {
         const type = payload.eventType;
         const row = (type === "DELETE" ? payload.old : payload.new) as Partial<WorkItem>;
-        if (row.id) onChange({ type, row: row as WorkItem });
+        if (row.id) handlers.onChange({ type, row: row as WorkItem });
       }
     )
-    .subscribe();
+    .on("presence", { event: "sync" }, () => {
+      const byId = new Map<string, Viewer>();
+      for (const metas of Object.values(channel.presenceState())) {
+        for (const meta of metas) if (isViewer(meta)) byId.set(meta.id, meta);
+      }
+      handlers.onPresence([...byId.values()]);
+    });
+
+  handlers.onStatus("connecting");
+  channel.subscribe((status) => {
+    if (status === "SUBSCRIBED") {
+      handlers.onStatus("connected");
+      if (viewer) void channel.track(viewer);
+    } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") handlers.onStatus("error");
+    else handlers.onStatus("offline"); // CLOSED
+  });
+  return channel;
+}
+
+// Local preview: other tabs on the same browser write the same localStorage key, which fires "storage" here.
+export function subscribeLocalWorkItems(projectId: string, onItems: (items: StoredWorkItem[]) => void): () => void {
+  const handler = (e: StorageEvent) => {
+    if (e.key === storageKey(projectId)) onItems(loadWorkItems(projectId));
+  };
+  window.addEventListener("storage", handler);
+  return () => window.removeEventListener("storage", handler);
 }
 
 export function unsubscribeWorkItems(channel: ReturnType<typeof subscribeWorkItems>): void {

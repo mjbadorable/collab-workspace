@@ -7,6 +7,7 @@ import { ChevronRight, Kanban, List, ListChecks, Pencil, Plus, Trash2, type Luci
 import { useAuth } from "@/lib/auth-context";
 import { initials, mockUser } from "@/lib/mock-data";
 import { getProjects } from "@/lib/projects";
+import { useProfile } from "@/lib/profile-context";
 import { useStorageTarget } from "@/lib/storage-target";
 import { useIsClient } from "@/lib/use-is-client";
 import { useWorkItems } from "@/lib/use-work-items";
@@ -15,6 +16,7 @@ import {
   workItemKey,
   type NewWorkItemInput,
   type StoredWorkItem,
+  type Viewer,
   type WorkItemPriority,
   type WorkItemStatus,
 } from "@/lib/work-items-storage";
@@ -87,10 +89,77 @@ function PillSelect<T extends string>({
 
 type Me = { id: string; name: string };
 
+// A teammate just changed this card/row: a brief indigo ring and pulse.
+const REMOTE_FLASH = "animate-pulse bg-indigo-50 ring-2 ring-indigo-400";
+
+const MAX_AVATARS = 3;
+
+function LiveStatusBadge({ cloud, status }: { cloud: boolean; status: "connected" | "connecting" | "offline" }) {
+  const live = cloud && status === "connected";
+  const connecting = cloud && status !== "connected";
+  const label = live ? "⚡ Live Sync" : connecting ? "Connecting..." : "Local Sync";
+  const tip = live
+    ? "Connected to real-time WebSockets"
+    : connecting
+      ? "Connecting to real-time WebSockets…"
+      : "Local preview: syncs across tabs in this browser";
+  return (
+    <span
+      role="status"
+      title={tip}
+      className="flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700"
+    >
+      <span className="relative flex h-2 w-2" aria-hidden>
+        {live && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />}
+        <span
+          className={`relative inline-flex h-2 w-2 rounded-full ${live ? "bg-emerald-500" : connecting ? "bg-amber-500" : "bg-neutral-400"}`}
+        />
+      </span>
+      {label}
+    </span>
+  );
+}
+
+function PresenceAvatars({ viewers }: { viewers: Viewer[] }) {
+  if (viewers.length === 0) return null;
+  const shown = viewers.slice(0, MAX_AVATARS);
+  const extra = viewers.length - shown.length;
+  return (
+    <ul aria-label="Teammates on this board" className="flex items-center -space-x-2">
+      {shown.map((v) => (
+        <li key={v.id} className="group relative">
+          {v.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element -- tiny data-URL thumbnail from user metadata
+            <img src={v.avatar_url} alt={v.name} className="h-7 w-7 rounded-full object-cover ring-2 ring-white" />
+          ) : (
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700 ring-2 ring-white">
+              {initials(v.name)}
+              <span className="sr-only">{v.name}</span>
+            </span>
+          )}
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute right-0 top-full z-20 mt-1.5 hidden whitespace-nowrap rounded-md bg-neutral-900 px-2 py-1 text-xs text-white group-hover:block"
+          >
+            {v.name} · {v.role}
+          </span>
+        </li>
+      ))}
+      {extra > 0 && (
+        <li className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200 text-[10px] font-semibold text-neutral-700 ring-2 ring-white">
+          +{extra}
+          <span className="sr-only"> more</span>
+        </li>
+      )}
+    </ul>
+  );
+}
+
 function WorkItemRow({
   item,
   projectId,
   me,
+  remote,
   onChange,
   onEdit,
   onDelete,
@@ -98,6 +167,7 @@ function WorkItemRow({
   item: StoredWorkItem;
   projectId: string;
   me: Me;
+  remote: boolean;
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -107,7 +177,11 @@ function WorkItemRow({
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
 
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-neutral-100 px-4 py-2 hover:bg-neutral-50">
+    <li
+      className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-neutral-100 px-4 py-2 transition-colors hover:bg-neutral-50 ${
+        remote ? REMOTE_FLASH : ""
+      }`}
+    >
       <span className="w-16 shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-center font-mono text-xs text-neutral-600">
         {key}
       </span>
@@ -184,6 +258,7 @@ function BoardCard({
   item,
   projectId,
   me,
+  remote,
   onChange,
   onEdit,
   onDelete,
@@ -191,6 +266,7 @@ function BoardCard({
   item: StoredWorkItem;
   projectId: string;
   me: Me;
+  remote: boolean;
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -206,7 +282,9 @@ function BoardCard({
         e.dataTransfer.setData("text/plain", item.id);
         e.dataTransfer.effectAllowed = "move";
       }}
-      className="cursor-grab rounded-lg border border-neutral-200 bg-white p-3 shadow-sm active:cursor-grabbing"
+      className={`cursor-grab rounded-lg border border-neutral-200 p-3 shadow-sm transition-colors active:cursor-grabbing ${
+        remote ? REMOTE_FLASH : "bg-white"
+      }`}
     >
       <div className="flex items-center justify-between gap-2">
         <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-600">{key}</span>
@@ -277,6 +355,7 @@ function KanbanBoard({
   items,
   projectId,
   me,
+  remoteUpdatedIds,
   onChange,
   onEdit,
   onDelete,
@@ -286,6 +365,7 @@ function KanbanBoard({
   items: StoredWorkItem[];
   projectId: string;
   me: Me;
+  remoteUpdatedIds: ReadonlySet<string>;
   onChange: (id: string, patch: Partial<StoredWorkItem>) => void;
   onEdit: (item: StoredWorkItem) => void;
   onDelete: (id: string) => void;
@@ -350,6 +430,7 @@ function KanbanBoard({
                   item={item}
                   projectId={projectId}
                   me={me}
+                  remote={remoteUpdatedIds.has(item.id)}
                   onChange={(patch) => onChange(item.id, patch)}
                   onEdit={() => onEdit(item)}
                   onDelete={() => onDelete(item.id)}
@@ -482,8 +563,25 @@ function ItemForm({
 }
 
 function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId: string | null }) {
-  const { items: allItems, error, add, update, softDelete } = useWorkItems(projectId, workspaceId);
+  const { user } = useAuth();
+  const { displayName, profile } = useProfile();
+  // Presence payload: only the small cloud thumbnail of the avatar is shared, never the full local image.
+  const metaAvatar = (user?.user_metadata as Record<string, unknown> | undefined)?.avatar_url;
+  const viewer: Viewer | null = user
+    ? { id: user.id, name: displayName, avatar_url: typeof metaAvatar === "string" ? metaAvatar : null, role: profile.role }
+    : null;
+  const {
+    items: allItems,
+    error,
+    add,
+    update,
+    softDelete,
+    realtimeStatus,
+    activeUsers,
+    remoteUpdatedIds,
+  } = useWorkItems(projectId, workspaceId, viewer);
   const items = allItems ?? [];
+  const teammates = activeUsers.filter((v) => v.id !== user?.id);
   const statusParam = parseStatus(useSearchParams().get("status"));
   const [filter, setFilter] = useState<Filter>(statusParam ?? "all");
   // Following a deep link while this view is already mounted: adopt the new status during render.
@@ -493,7 +591,6 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     if (statusParam) setFilter(statusParam);
   }
   const { open, openDialog, closeDialog } = useNewWorkItem();
-  const { user } = useAuth();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const editDialogRef = useRef<HTMLDialogElement>(null);
   const [editingItem, setEditingItem] = useState<StoredWorkItem | null>(null);
@@ -550,6 +647,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
           <span className="font-medium text-neutral-900">Work items</span>
         </nav>
         <div className="flex shrink-0 items-center gap-3">
+          <PresenceAvatars viewers={teammates} />
+          <LiveStatusBadge cloud={workspaceId !== null} status={realtimeStatus} />
           <div role="group" aria-label="View" className="flex rounded-md bg-neutral-100 p-0.5">
             {viewOptions.map(({ value, label, icon: Icon }) => (
               <button
@@ -615,6 +714,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             items={live}
             projectId={projectId}
             me={me}
+            remoteUpdatedIds={remoteUpdatedIds}
             onChange={update}
             onEdit={setEditingItem}
             onDelete={softDelete}
@@ -639,6 +739,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
                 item={item}
                 projectId={projectId}
                 me={me}
+                remote={remoteUpdatedIds.has(item.id)}
                 onChange={(patch) => update(item.id, patch)}
                 onEdit={() => setEditingItem(item)}
                 onDelete={() => softDelete(item.id)}
