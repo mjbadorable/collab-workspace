@@ -1,4 +1,4 @@
-import { mockProjects } from "./mock-data";
+import { getProjects } from "./projects";
 import { supabase } from "./supabase";
 
 // Routes use the local project ids ("exam-reviewer-app"); the database has uuids. A project is matched by
@@ -19,7 +19,7 @@ async function lookup(workspaceId: string, identifier: string): Promise<string |
 
 async function resolve(workspaceId: string, localProjectId: string): Promise<string> {
   if (!supabase) throw new Error("Supabase is not configured.");
-  const known = mockProjects.find((p) => p.id === localProjectId);
+  const known = getProjects().find((p) => p.id === localProjectId);
   if (!known) throw new Error(`Unknown project "${localProjectId}".`);
 
   const existing = await lookup(workspaceId, known.identifier);

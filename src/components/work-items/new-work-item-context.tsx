@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { mockProjects } from "@/lib/mock-data";
+import { getProjects, SEED_PROJECT } from "@/lib/projects";
 
 type NewWorkItemContext = { open: boolean; openDialog: () => void; closeDialog: () => void };
 
@@ -30,7 +30,7 @@ export function NewWorkItemProvider({ children }: { children: ReactNode }) {
   const openDialog = useCallback(() => {
     // Read the URL at call time (not via usePathname) so this provider needs no Suspense boundary.
     const { pathname } = window.location;
-    const projectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] ?? mockProjects[0].id;
+    const projectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] ?? getProjects()[0]?.id ?? SEED_PROJECT.id;
     if (!pathname.startsWith(`/projects/${projectId}/work-items`)) {
       router.push(`/projects/${projectId}/work-items`);
     }

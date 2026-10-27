@@ -5,14 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { PenTool, Plus, Search } from "lucide-react";
 import { createDesignFile, loadDesignFiles } from "@/lib/design-storage";
-import { mockProjects } from "@/lib/mock-data";
+import { getProjects } from "@/lib/projects";
 import { relativeTime } from "@/lib/relative-time";
 import { useIsClient } from "@/lib/use-is-client";
 
 const fieldClass =
   "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
 
-const projectName = (id: string) => mockProjects.find((p) => p.id === id)?.name ?? id;
+const projectName = (id: string) => getProjects().find((p) => p.id === id)?.name ?? id;
 
 function Hub() {
   const router = useRouter();
@@ -127,7 +127,7 @@ function Hub() {
                 Project
               </label>
               <select id="df-project" name="project" className={fieldClass}>
-                {mockProjects.map((p) => (
+                {getProjects().map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>

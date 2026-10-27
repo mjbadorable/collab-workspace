@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent, type React
 import Link from "next/link";
 import { ChevronRight, Kanban, List, ListChecks, Pencil, Plus, Trash2, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { initials, mockProjects, mockUser } from "@/lib/mock-data";
+import { initials, mockUser } from "@/lib/mock-data";
+import { getProjects } from "@/lib/projects";
 import { useStorageTarget } from "@/lib/storage-target";
 import { useIsClient } from "@/lib/use-is-client";
 import { useWorkItems } from "@/lib/use-work-items";
@@ -512,7 +513,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
   const live = items.filter((i) => !i.deleted_at).sort((a, b) => a.seq - b.seq);
   const visible = filter === "all" ? live : live.filter((i) => i.status === filter);
   const count = (f: Filter) => (f === "all" ? live.length : live.filter((i) => i.status === f).length);
-  const projectName = mockProjects.find((p) => p.id === projectId)?.name ?? projectId;
+  const projectName = getProjects().find((p) => p.id === projectId)?.name ?? projectId;
 
   return (
     <div className="flex h-full flex-col">

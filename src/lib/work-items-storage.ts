@@ -1,5 +1,6 @@
 import type { WorkItem } from "./database.types";
-import { mockProjects, mockUser } from "./mock-data";
+import { mockUser } from "./mock-data";
+import { getProjects } from "./projects";
 import { supabase } from "./supabase";
 
 export type WorkItemStatus = WorkItem["status"];
@@ -19,7 +20,7 @@ export type NewWorkItemInput = {
 const storageKey = (projectId: string) => `collab-workspace:work-items:${projectId}`;
 
 export function projectIdentifier(projectId: string): string {
-  const known = mockProjects.find((p) => p.id === projectId)?.identifier;
+  const known = getProjects().find((p) => p.id === projectId)?.identifier;
   return known ?? (projectId.replace(/[^a-z0-9]/gi, "").slice(0, 3).toUpperCase() || "WI");
 }
 

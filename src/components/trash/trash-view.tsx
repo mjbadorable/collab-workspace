@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckSquare, Network, RotateCcw, Search, Trash2, type LucideIcon } from "lucide-react";
-import { mockProjects } from "@/lib/mock-data";
+import { getProjects } from "@/lib/projects";
 import { relativeTime } from "@/lib/relative-time";
 import { supabase } from "@/lib/supabase";
 import { useStorageTarget } from "@/lib/storage-target";
@@ -50,7 +50,7 @@ const newestFirst = (entries: TrashEntry[]) => entries.sort((a, b) => b.deletedA
 
 function collectLocalTrash(): TrashEntry[] {
   const entries: TrashEntry[] = [];
-  for (const project of mockProjects) {
+  for (const project of getProjects()) {
     for (const item of loadWorkItems(project.id)) {
       if (!item.deleted_at) continue;
       entries.push({

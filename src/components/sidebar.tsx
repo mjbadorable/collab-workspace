@@ -10,6 +10,7 @@ import {
   ChevronsUpDown,
   Home,
   Layers,
+  Network,
   LogOut,
   Palette,
   Plus,
@@ -22,7 +23,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import PokeballIcon from "@/components/pokeball-icon";
-import { initials, mockProjects, mockUser, mockWorkspace, projectLinks } from "@/lib/mock-data";
+import { initials, mockUser, mockWorkspace, projectLinks } from "@/lib/mock-data";
+import { useProjects } from "@/lib/projects-context";
 
 const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Home", href: "/", icon: Home },
@@ -49,7 +51,8 @@ export default function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { openDialog } = useNewWorkItem();
-  const [open, setOpen] = useState<Record<string, boolean>>({ [mockProjects[0].id]: true });
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const { projects, currentProject, getProjectDiagrams, openCreateDialog } = useProjects();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const { user, loading, signOut } = useAuth();
   const { workspaces, current, select } = useWorkspaces();
@@ -170,10 +173,25 @@ export default function Sidebar({
         </ul>
 
         <div>
-          <p className="px-2.5 pb-1 text-xs font-medium uppercase tracking-wide text-neutral-400">Projects</p>
+          <div className="flex items-center justify-between px-2.5 pb-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Projects</p>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate?.();
+                openCreateDialog();
+              }}
+              aria-label="Create project"
+              title="Create project"
+              className="rounded p-0.5 text-neutral-400 hover:bg-neutral-200 hover:text-red-600"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+            </button>
+          </div>
           <ul className="space-y-0.5">
-            {mockProjects.map((project) => {
-              const expanded = !!open[project.id];
+            {projects.map((project, index) => {
+              // An explicit toggle wins; otherwise the project you're in (or the first one) starts expanded.
+              const expanded = open[project.id] ?? (currentProject ? currentProject.id === project.id : index === 0);
               const Chevron = expanded ? ChevronDown : ChevronRight;
               return (
                 <li key={project.id}>
@@ -183,18 +201,56 @@ export default function Sidebar({
                     onClick={() => setOpen((s) => ({ ...s, [project.id]: !expanded }))}
                     className={`${itemClass(false)} w-full`}
                   >
-                    <Chevron className="h-4 w-4 text-neutral-400" />
+                    <Chevron className="h-4 w-4 shrink-0 text-neutral-400" />
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-linear-to-br from-red-500 to-amber-400 text-[11px] font-semibold text-white">
+                      {project.icon ?? project.name[0]?.toUpperCase()}
+                    </span>
                     <span className="truncate">{project.name}</span>
                   </button>
                   {expanded && (
                     <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-neutral-200 pl-2">
                       {projectLinks.map((link) => {
                         const href = `/projects/${project.id}/${link.slug}`;
+                        if (link.slug !== "diagrams") {
+                          return (
+                            <li key={link.slug}>
+                              <Link href={href} onClick={onNavigate} className={itemClass(pathname === href)}>
+                                {link.label}
+                              </Link>
+                            </li>
+                          );
+                        }
+                        const diagramsKey = `${project.id}:diagrams`;
+                        const diagramsOpen = open[diagramsKey] ?? pathname === href;
+                        const DiagramChevron = diagramsOpen ? ChevronDown : ChevronRight;
                         return (
                           <li key={link.slug}>
-                            <Link href={href} onClick={onNavigate} className={itemClass(pathname === href)}>
-                              {link.label}
-                            </Link>
+                            <div className="flex items-center">
+                              <Link href={href} onClick={onNavigate} className={`${itemClass(pathname === href)} flex-1`}>
+                                {link.label}
+                              </Link>
+                              <button
+                                type="button"
+                                aria-expanded={diagramsOpen}
+                                aria-label={`${diagramsOpen ? "Collapse" : "Expand"} diagrams`}
+                                onClick={() => setOpen((s) => ({ ...s, [diagramsKey]: !diagramsOpen }))}
+                                className="rounded p-1 text-neutral-400 hover:bg-neutral-200"
+                              >
+                                <DiagramChevron className="h-3.5 w-3.5" aria-hidden />
+                              </button>
+                            </div>
+                            {diagramsOpen && (
+                              <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-neutral-200 pl-2">
+                                {getProjectDiagrams(project.id).map((d) => (
+                                  <li key={d.id}>
+                                    <Link href={d.href} onClick={onNavigate} className={itemClass(false)}>
+                                      <Network className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
+                                      <span className="truncate">{d.name}</span>
+                                    </Link>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
                           </li>
                         );
                       })}

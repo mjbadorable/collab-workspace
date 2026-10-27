@@ -1,29 +1,14 @@
 "use client";
 
 import { Suspense, use } from "react";
-import { Settings } from "lucide-react";
-import PlaceholderView from "@/components/placeholder-view";
-import { projectIdentifier } from "@/lib/work-items-storage";
+import ProjectSettingsView from "@/components/settings/project-settings-view";
 
 type Params = Promise<{ id: string }>;
 
 // With Cache Components, reading params must happen under a Suspense boundary.
 function Content({ params }: { params: Params }) {
   const { id } = use(params);
-  return (
-    <PlaceholderView
-      title="Project settings"
-      description="Configure the project name, identifier and members."
-      icon={Settings}
-      breadcrumbs={[
-        { label: "Projects", href: "/projects" },
-        { label: projectIdentifier(id), href: `/projects/${id}/work-items` },
-        { label: "Settings" },
-      ]}
-      backHref={`/projects/${id}/work-items`}
-      backLabel="Back to Work items"
-    />
-  );
+  return <ProjectSettingsView projectId={id} />;
 }
 
 export default function ProjectSettingsPage({ params }: { params: Params }) {

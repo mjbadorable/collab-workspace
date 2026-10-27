@@ -4,6 +4,7 @@ import { Suspense, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
+import { ProjectsProvider } from "@/lib/projects-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import InviteDialog from "./settings/invite-dialog";
 import Sidebar from "./sidebar";
@@ -19,7 +20,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <WorkspaceProvider>
         {/* usePathname() below is request-time data on dynamic routes, so it must sit under Suspense. */}
         <Suspense fallback={<div className="h-screen" />}>
-          <Chrome>{children}</Chrome>
+          <ProjectsProvider>
+            <Chrome>{children}</Chrome>
+          </ProjectsProvider>
         </Suspense>
       </WorkspaceProvider>
     </AuthProvider>

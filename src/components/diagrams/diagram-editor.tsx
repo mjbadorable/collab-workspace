@@ -41,7 +41,7 @@ import {
   toStored,
   type StoredDiagram,
 } from "@/lib/diagram-storage";
-import { mockProjects } from "@/lib/mock-data";
+import { getProjects } from "@/lib/projects";
 import { useStorageTarget } from "@/lib/storage-target";
 import { useIsClient } from "@/lib/use-is-client";
 import { nodeTypes, type DiagramNode } from "./nodes";
@@ -121,7 +121,7 @@ function Editor({ projectId, initial, onSave, cloud }: EditorProps) {
     URL.revokeObjectURL(url);
   };
 
-  const projectName = mockProjects.find((p) => p.id === projectId)?.name ?? projectId;
+  const projectName = getProjects().find((p) => p.id === projectId)?.name ?? projectId;
   const saved = snapshot === savedSnapshot;
   const failed = !saved && snapshot === failedSnapshot;
   const hand = tool === "hand";

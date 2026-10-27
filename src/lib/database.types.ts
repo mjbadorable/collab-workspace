@@ -23,6 +23,12 @@ export type Project = {
   workspace_id: string;
   name: string;
   identifier: string;
+  // description..live_url are added by supabase/projects.sql.
+  description: string | null;
+  icon: string | null;
+  is_public: boolean;
+  github_url: string | null;
+  live_url: string | null;
   deleted_at: string | null;
   created_at: string;
 };

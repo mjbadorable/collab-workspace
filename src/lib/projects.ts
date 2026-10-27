@@ -1,0 +1,219 @@
+import type { Project } from "./database.types";
+import { supabase } from "./supabase";
+
+// Project metadata. The registry lives in localStorage in every mode (routes use its slug ids); when signed in,
+// changes are mirrored to the Supabase `projects` table and unknown cloud projects are merged back in.
+export type ProjectRecord = {
+  id: string; // URL slug, e.g. "exam-reviewer-app"
+  name: string;
+  identifier: string; // "ERA": work items are numbered ERA-1, ERA-2, ...
+  description: string;
+  icon: string | null; // emoji; null falls back to the name's first letter
+  is_public: boolean;
+  github_url: string;
+  live_url: string;
+  lead: string | null; // local-only
+  created_at: string;
+};
+
+export type ProjectInput = Pick<ProjectRecord, "name" | "identifier"> &
+  Partial<Pick<ProjectRecord, "description" | "icon" | "is_public" | "github_url" | "live_url" | "lead">>;
+
+export const SEED_PROJECT: ProjectRecord = {
+  id: "exam-reviewer-app",
+  name: "Exam Reviewer App",
+  identifier: "ERA",
+  description: "Offline-first exam reviewer with split-screen PDF practice.",
+  icon: null,
+  is_public: true,
+  github_url: "https://github.com/mjbadorable/exam-reviewer-app",
+  live_url: "https://exam-reviewer.vercel.app",
+  lead: null,
+  created_at: "2026-10-01T00:00:00.000Z",
+};
+
+export const SEED_PROJECTS: ProjectRecord[] = [SEED_PROJECT];
+
+const KEY = "collab-workspace:projects";
+const listeners = new Set<() => void>();
+
+// useSyncExternalStore needs a referentially stable snapshot, so the parsed list is cached per raw string.
+let cachedRaw: string | null = null;
+let cachedList: ProjectRecord[] = SEED_PROJECTS;
+
+function readRaw(): string | null {
+  try {
+    return localStorage.getItem(KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function getProjects(): ProjectRecord[] {
+  const raw = readRaw();
+  if (raw === cachedRaw) return cachedList;
+  cachedRaw = raw;
+  cachedList = SEED_PROJECTS;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) cachedList = parsed as ProjectRecord[];
+    } catch {
+      // corrupt JSON: fall back to the seed
+    }
+  }
+  return cachedList;
+}
+
+export function subscribeProjects(callback: () => void): () => void {
+  listeners.add(callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    listeners.delete(callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function write(list: ProjectRecord[]) {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(list));
+  } catch {
+    // storage blocked: nothing persists, but the session keeps working from the last snapshot
+    return;
+  }
+  listeners.forEach((l) => l());
+}
+
+// ---------------------------------------------------------------- helpers
+
+export function slugify(name: string): string {
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "project";
+}
+
+// "Student Portal" -> "SP", "Exam" -> "EXA"
+export function suggestIdentifier(name: string): string {
+  const words = name.trim().split(/[^A-Za-z0-9]+/).filter(Boolean);
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  return words
+    .slice(0, 5)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+export const normalizeIdentifier = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+
+// ---------------------------------------------------------------- local mutations
+
+export function createLocalProject(input: ProjectInput): ProjectRecord {
+  const list = getProjects();
+  const base = slugify(input.name);
+  let id = base;
+  for (let n = 2; list.some((p) => p.id === id); n++) id = `${base}-${n}`;
+  const record: ProjectRecord = {
+    id,
+    name: input.name.trim(),
+    identifier: input.identifier,
+    description: input.description?.trim() ?? "",
+    icon: input.icon ?? null,
+    is_public: input.is_public ?? true,
+    github_url: input.github_url?.trim() ?? "",
+    live_url: input.live_url?.trim() ?? "",
+    lead: input.lead ?? null,
+    created_at: new Date().toISOString(),
+  };
+  write([...list, record]);
+  return record;
+}
+
+export function updateLocalProject(id: string, patch: Partial<Omit<ProjectRecord, "id" | "created_at">>) {
+  write(getProjects().map((p) => (p.id === id ? { ...p, ...patch } : p)));
+}
+
+export function deleteLocalProject(id: string) {
+  write(getProjects().filter((p) => p.id !== id));
+}
+
+// Adds cloud projects this device has not seen. Matching is by identifier, which is unique per workspace.
+export function mergeRemoteProjects(rows: Project[]) {
+  const list = getProjects();
+  const known = new Set(list.map((p) => p.identifier));
+  const added = rows.filter((r) => !known.has(r.identifier));
+  if (added.length === 0) return;
+  const next = [...list];
+  for (const r of added) {
+    const base = slugify(r.name);
+    let id = base;
+    for (let n = 2; next.some((p) => p.id === id); n++) id = `${base}-${n}`;
+    next.push({
+      id,
+      name: r.name,
+      identifier: r.identifier,
+      description: r.description ?? "",
+      icon: r.icon,
+      is_public: r.is_public ?? true,
+      github_url: r.github_url ?? "",
+      live_url: r.live_url ?? "",
+      lead: null,
+      created_at: r.created_at,
+    });
+  }
+  write(next);
+}
+
+// ---------------------------------------------------------------- cloud mirror
+
+const columns = (p: ProjectRecord) => ({
+  name: p.name,
+  description: p.description || null,
+  icon: p.icon,
+  is_public: p.is_public,
+  github_url: p.github_url || null,
+  live_url: p.live_url || null,
+});
+
+function client() {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  return supabase;
+}
+
+export async function fetchCloudProjects(workspaceId: string): Promise<Project[]> {
+  const { data, error } = await client().from("projects").select("*").eq("workspace_id", workspaceId).is("deleted_at", null);
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Inserts the project, or revives/updates the row when its identifier already exists in the workspace.
+export async function pushCloudProject(workspaceId: string, project: ProjectRecord): Promise<void> {
+  const db = client();
+  const { data: existing, error: lookupError } = await db
+    .from("projects")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("identifier", project.identifier)
+    .maybeSingle();
+  if (lookupError) throw new Error(lookupError.message);
+  const { error } = existing
+    ? await db.from("projects").update({ ...columns(project), deleted_at: null }).eq("id", existing.id)
+    : await db.from("projects").insert({ workspace_id: workspaceId, identifier: project.identifier, ...columns(project) });
+  if (error) throw new Error(error.message);
+}
+
+export async function removeCloudProject(workspaceId: string, identifier: string): Promise<void> {
+  const { error } = await client()
+    .from("projects")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("workspace_id", workspaceId)
+    .eq("identifier", identifier);
+  if (error) throw new Error(error.message);
+}
+
+// ---------------------------------------------------------------- diagrams
+
+export type ProjectDiagram = { id: string; name: string; href: string };
+
+// The editor currently holds one diagram per project, created on first save, so that is what the tree lists.
+export function getProjectDiagrams(projectId: string): ProjectDiagram[] {
+  return [{ id: "main", name: "Main Architecture", href: `/projects/${projectId}/diagrams` }];
+}

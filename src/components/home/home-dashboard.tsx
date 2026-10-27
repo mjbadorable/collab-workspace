@@ -6,13 +6,15 @@ import Greeting from "@/components/greeting";
 import { priorityOptions, statusOptions } from "@/components/work-items/work-items-view";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import { useAuth } from "@/lib/auth-context";
-import { mockProjects, mockUser, mockWorkspace } from "@/lib/mock-data";
+import { mockUser, mockWorkspace } from "@/lib/mock-data";
+import { SEED_PROJECT } from "@/lib/projects";
+import { useProjects } from "@/lib/projects-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { workItemKey, type StoredWorkItem } from "@/lib/work-items-storage";
 import LiveWorkItems from "./live-work-items";
 import ProjectCard from "./project-card";
 
-const project = mockProjects[0];
+const project = SEED_PROJECT;
 
 const launchpad = [
   {
@@ -104,6 +106,8 @@ function WorkList({ items }: { items: StoredWorkItem[] | null }) {
 export default function HomeDashboard() {
   const { user } = useAuth();
   const { current } = useWorkspaces();
+  const { projects } = useProjects();
+  const primary = projects.find((p) => p.id === project.id) ?? project;
   // Cloud users are named after their email; local preview keeps the mock user.
   const name = user
     ? (user.email ?? "there").split("@")[0].replace(/[._-]+/g, " ")
@@ -127,7 +131,7 @@ export default function HomeDashboard() {
 
             <h2 className="mt-8 text-sm font-semibold text-neutral-700">Active project</h2>
             <div className="mt-3">
-              <ProjectCard project={project} items={items} />
+              <ProjectCard project={primary} items={items} />
             </div>
 
             <h2 className="mt-8 text-sm font-semibold text-neutral-700">Your work items</h2>
