@@ -16,6 +16,7 @@ import {
   Network,
   LogOut,
   Palette,
+  Pencil,
   Plus,
   Settings,
   Trash2,
@@ -26,7 +27,9 @@ import { useAuth } from "@/lib/auth-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import PokeballIcon from "@/components/pokeball-icon";
-import { initials, mockUser, mockWorkspace } from "@/lib/mock-data";
+import Avatar from "@/components/settings/avatar";
+import { mockWorkspace } from "@/lib/mock-data";
+import { useProfile } from "@/lib/profile-context";
 import { useProjects } from "@/lib/projects-context";
 
 const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
@@ -56,21 +59,23 @@ export default function Sidebar({
   onNavigate,
   onNewWorkspace,
   onInvite,
+  onEditProfile,
 }: {
   onNavigate?: () => void;
   onNewWorkspace: () => void;
   onInvite: () => void;
+  onEditProfile: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const { openDialog } = useNewWorkItem();
   const [open, setOpen] = useState<Record<string, boolean>>({});
+  const { profile, displayName } = useProfile();
   const { projects, currentProject, getProjectDiagrams, openCreateDialog } = useProjects();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const { user, loading, signOut } = useAuth();
   const { workspaces, current, select } = useWorkspaces();
   const workspaceName = current?.name ?? mockWorkspace.name;
-  const emailName = user?.email?.split("@")[0] ?? "";
 
   // Project sub-routes live under /projects/..., so "Projects" matches only its own page.
   const isActive = (href: string) => (href === "/" || href === "/projects" ? pathname === href : pathname.startsWith(href));
@@ -284,11 +289,21 @@ export default function Sidebar({
           <div className="h-12" aria-hidden />
         ) : (
           <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-semibold text-red-700">
-              {user ? initials(emailName.replace(/[._-]+/g, " ")) || "?" : initials(mockUser.name)}
-            </span>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate?.();
+                onEditProfile();
+              }}
+              aria-label="Edit profile"
+              className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+            >
+              <Avatar url={profile.avatar_url} name={displayName} />
+            </button>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{user ? user.email : mockUser.name}</p>
+              <p className="truncate text-sm font-medium" title={user?.email ?? undefined}>
+                {displayName}
+              </p>
               <p className="flex items-center gap-1.5 truncate text-xs text-neutral-500">
                 <span className="rounded bg-amber-400 px-1 text-[10px] font-semibold uppercase text-neutral-900">
                   Trainer
@@ -296,6 +311,18 @@ export default function Sidebar({
                 {user ? "Signed in" : "Local preview"} · Admin
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate?.();
+                onEditProfile();
+              }}
+              title="Edit profile"
+              aria-label="Edit profile"
+              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
             {user ? (
               <button
                 type="button"

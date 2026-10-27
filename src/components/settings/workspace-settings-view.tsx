@@ -9,10 +9,12 @@ import { initials, mockUser, mockWorkspace } from "@/lib/mock-data";
 import { useIsClient } from "@/lib/use-is-client";
 import { useWorkspaces } from "@/lib/workspace-context";
 import InviteDialog from "./invite-dialog";
+import ProfileForm from "./profile-form";
 
-type Tab = "general" | "members";
+type Tab = "profile" | "general" | "members";
 
 const tabs: { value: Tab; label: string }[] = [
+  { value: "profile", label: "Profile" },
   { value: "general", label: "General" },
   { value: "members", label: "Members" },
 ];
@@ -25,6 +27,17 @@ function Field({ label, children }: { label: string; children: string }) {
     <div>
       <p className="text-xs font-medium text-neutral-500">{label}</p>
       <p className="mt-1 rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-sm">{children}</p>
+    </div>
+  );
+}
+
+function Profile() {
+  return (
+    <div className="space-y-5">
+      <h2 className="text-base font-semibold">Profile</h2>
+      <div className="max-w-md">
+        <ProfileForm />
+      </div>
     </div>
   );
 }
@@ -185,7 +198,7 @@ export default function WorkspaceSettingsView() {
   const mounted = useIsClient();
   const { user } = useAuth();
   const { current, loading } = useWorkspaces();
-  const [tab, setTab] = useState<Tab>("general");
+  const [tab, setTab] = useState<Tab>("profile");
 
   if (!mounted || loading) return <div className="h-full" />;
 
@@ -209,7 +222,9 @@ export default function WorkspaceSettingsView() {
           ))}
         </nav>
         <div className="min-w-0 flex-1">
-          {tab === "general" ? (
+          {tab === "profile" ? (
+            <Profile />
+          ) : tab === "general" ? (
             <General />
           ) : user && current ? (
             // Remount per workspace so the list never shows another workspace's members.

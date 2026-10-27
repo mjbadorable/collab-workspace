@@ -4,8 +4,10 @@ import { Suspense, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
+import { ProfileProvider } from "@/lib/profile-context";
 import { ProjectsProvider } from "@/lib/projects-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
+import EditProfileDialog from "./settings/edit-profile-dialog";
 import InviteDialog from "./settings/invite-dialog";
 import Sidebar from "./sidebar";
 import WorkspaceDialog from "./workspace-dialog";
@@ -17,6 +19,7 @@ const SidebarFallback = () => <div className="h-full w-64 border-r border-neutra
 export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <AuthProvider>
+      <ProfileProvider>
       <WorkspaceProvider>
         {/* usePathname() below is request-time data on dynamic routes, so it must sit under Suspense. */}
         <Suspense fallback={<div className="h-screen" />}>
@@ -25,6 +28,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </ProjectsProvider>
         </Suspense>
       </WorkspaceProvider>
+      </ProfileProvider>
     </AuthProvider>
   );
 }
@@ -33,6 +37,7 @@ function Chrome({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [workspaceRequested, setWorkspaceRequested] = useState(false);
   const [inviteRequested, setInviteRequested] = useState(false);
+  const [profileRequested, setProfileRequested] = useState(false);
   const pathname = usePathname();
 
   // The login page is a full-screen landing page: no sidebar, mobile header or workspace dialog.
@@ -44,7 +49,7 @@ function Chrome({ children }: { children: ReactNode }) {
       {/* Desktop: fixed sidebar */}
       <aside className="hidden md:block">
         <Suspense fallback={<SidebarFallback />}>
-          <Sidebar onNewWorkspace={() => setWorkspaceRequested(true)} onInvite={() => setInviteRequested(true)} />
+          <Sidebar onNewWorkspace={() => setWorkspaceRequested(true)} onInvite={() => setInviteRequested(true)} onEditProfile={() => setProfileRequested(true)} />
         </Suspense>
       </aside>
 
@@ -62,6 +67,10 @@ function Chrome({ children }: { children: ReactNode }) {
                 onInvite={() => {
                   setMobileOpen(false);
                   setInviteRequested(true);
+                }}
+                onEditProfile={() => {
+                  setMobileOpen(false);
+                  setProfileRequested(true);
                 }}
               />
             </Suspense>
@@ -94,6 +103,7 @@ function Chrome({ children }: { children: ReactNode }) {
     </div>
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
     <InviteDialog open={inviteRequested} onClose={() => setInviteRequested(false)} />
+    <EditProfileDialog open={profileRequested} onClose={() => setProfileRequested(false)} />
     </NewWorkItemProvider>
   );
 }
