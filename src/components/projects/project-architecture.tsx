@@ -243,9 +243,6 @@ export default function ProjectArchitecture({ projectId }: { projectId: string }
         <Link href={`${base}/diagrams`} className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100">
           📐 Open Flowchart / Diagrams
         </Link>
-        <Link href={`${base}/designs`} className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm hover:bg-neutral-100">
-          🎨 Open Design Studio
-        </Link>
       </nav>
     </div>
   );

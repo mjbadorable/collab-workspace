@@ -37,7 +37,7 @@ function CreateForm({ onDone, onSkip, first }: { onDone: () => void; onSkip: () 
     <form onSubmit={submit} className="space-y-4 p-5">
       <div>
         <h2 className="text-base font-semibold">{first ? "Create your workspace" : "New workspace"}</h2>
-        {first && <p className="mt-1 text-sm text-neutral-500">A workspace holds your projects, work items and designs.</p>}
+        {first && <p className="mt-1 text-sm text-neutral-500">A workspace holds your projects, work items and flowcharts.</p>}
       </div>
       <div>
         <label htmlFor="ws-name" className="mb-1 block text-xs font-medium text-neutral-600">

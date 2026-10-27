@@ -1,27 +1,19 @@
-"use client";
-
-import { Suspense, use, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { getProjectDesignFile } from "@/lib/design-storage";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
 type Params = Promise<{ id: string }>;
 
-// Opens this project's own design file, creating a starter one the first time. Other projects' files are never shown.
-function Content({ params }: { params: Params }) {
-  const { id } = use(params);
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace(`/projects/${id}/designs/${getProjectDesignFile(id).id}`);
-  }, [id, router]);
-
-  return <p className="px-6 py-8 text-sm text-neutral-500">Opening designs…</p>;
+// With Cache Components, reading params must happen under a Suspense boundary.
+async function Redirect({ params }: { params: Params }): Promise<never> {
+  const { id } = await params;
+  redirect(`/projects/${id}/diagrams`);
 }
 
+// The Design Studio was removed; old links land on the project's flowcharts.
 export default function ProjectDesignsPage({ params }: { params: Params }) {
   return (
     <Suspense fallback={<div className="h-full w-full" />}>
-      <Content params={params} />
+      <Redirect params={params} />
     </Suspense>
   );
 }

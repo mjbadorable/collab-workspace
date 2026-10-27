@@ -1,6 +1,8 @@
 import type { Edge } from "@xyflow/react";
 import type { DiagramNode } from "@/components/diagrams/nodes";
 import type { Diagram, Json } from "./database.types";
+import { getProjects, SEED_PROJECT, type ProjectRecord } from "./projects";
+import { hostingOf } from "./project-stack";
 import { supabase } from "./supabase";
 
 // deleted_at mirrors the diagrams table; nothing sets it yet, but the Trash view honours it.
@@ -105,53 +107,136 @@ export async function restoreCloudDiagram(id: string): Promise<void> {
   if (data.length === 0) throw new Error("That diagram could not be restored.");
 }
 
-type Step = { id: string; label: string; type: "terminal" | "process" | "decision"; x: number; y: number };
+// ---------------------------------------------------------------- categorized process flows (read-only)
 
-function flow(steps: Step[]): StoredDiagram {
-  const nodes: DiagramNode[] = steps.map(({ id, label, type, x, y }) => ({ id, type, position: { x, y }, data: { label } }));
-  const edges: Edge[] = nodes.slice(1).map((n, i) => ({
-    id: `e-${nodes[i].id}-${n.id}`,
-    source: nodes[i].id,
-    target: n.id,
-    sourceHandle: "right",
-    targetHandle: "left",
-  }));
-  return { nodes, edges };
+export type FlowCategory = "user" | "system" | "backend";
+export type FlowStepKind = "terminal" | "process" | "decision";
+export type FlowStep = { id: string; label: string; kind: FlowStepKind; role: string; payload: string };
+export type Flow = { category: FlowCategory; title: string; summary: string; steps: FlowStep[] };
+
+export const flowCategories: { value: FlowCategory; label: string; emoji: string; title: string }[] = [
+  { value: "user", label: "User Flow", emoji: "👤", title: "How a person moves through the product" },
+  { value: "system", label: "System Flow", emoji: "⚙️", title: "How the application layers hand work to each other" },
+  { value: "backend", label: "Backend & Storage Flow", emoji: "🗄️", title: "Where data lives and how it is delivered" },
+];
+
+export const parseFlowCategory = (value: string | null): FlowCategory =>
+  flowCategories.find((c) => c.value === value)?.value ?? "user";
+
+const step = (label: string, kind: FlowStepKind, role: string, payload: string): Omit<FlowStep, "id"> => ({ label, kind, role, payload });
+const withIds = (steps: Omit<FlowStep, "id">[]): FlowStep[] => steps.map((s, i) => ({ ...s, id: `s${i + 1}` }));
+
+const meta: Record<FlowCategory, Pick<Flow, "title" | "summary">> = {
+  user: { title: "User Flow", summary: "What a person does, start to finish." },
+  system: { title: "System Flow", summary: "How the application layers pass work along." },
+  backend: { title: "Backend & Storage Flow", summary: "Where data is kept, backed up and delivered." },
+};
+
+const EXAM_REVIEWER: Record<FlowCategory, Omit<FlowStep, "id">[]> = {
+  user: [
+    step("Select Exam Paper", "terminal", "Entry point: pick a saved paper or upload a new PDF.", "pdfId, question bank"),
+    step("Split-Screen Viewport", "process", "Shows the exam PDF beside the answer pane.", "PDF page, zoom level, scroll position"),
+    step("Bubble Sheet Answering", "process", "The learner marks choices while reading the paper.", "questionId → selected option ids"),
+    step("Flagged Item Review", "decision", "Revisit flagged questions before submitting.", "flagged question ids"),
+    step("Score & Telemetry Summary", "terminal", "Final score with per-question pacing.", "score %, time per question, weak topics"),
+  ],
+  system: [
+    step("React UI", "terminal", "Renders the split view and captures clicks and keys.", "user events"),
+    step("Ephemeral Zustand Store (1s Ticks)", "process", "Holds timer ticks, cursor and zoom with 0 ms UI latency.", "currentIndex, elapsed seconds"),
+    step("PDF.js Web Worker", "process", "Rasterises visible pages off the main thread.", "page bitmaps, text layer"),
+    step("Atomic Write-Behind Queue", "process", "Debounced flush of answers and progress in one transaction.", "session answers, progress rows"),
+    step("IndexedDB", "terminal", "Durable store the UI reads back through live queries.", "examSessions, userProgress"),
+  ],
+  backend: [
+    step("Service Worker Cache Storage (sw.js)", "terminal", "Precaches the app shell so exams open offline.", "HTML, JS, CSS, PDF worker"),
+    step("IndexedDB (Dexie v4) · Metadata vs Binary Blobs", "process", "Light metadata stays queryable; heavy PDFs sit in a separate store.", "pdfMetadata (<2 KB), pdfBlobs"),
+    step("JSON/ZIP Snapshot Backup", "terminal", "Exports progress, optionally with PDFs, for another device.", ".exambackup.json.gz, .examarchive.zip"),
+  ],
+};
+
+const GRADE_ASSISTANT: Record<FlowCategory, Omit<FlowStep, "id">[]> = {
+  user: [
+    step("Select Course & Term", "terminal", "Entry point: open a class and choose Prelim, Midterm or Final.", "course, section, term"),
+    step("Set Assessment Component Weights (CS % / WE %)", "process", "Defines how Class Standing and Written Exam combine.", "CS %, WE % per term"),
+    step("Enter Student Raw Marks", "process", "Type or paste scores from Excel.", "per-student CS and WE raw scores"),
+    step("Step Transmutation & Double-Rounding", "process", "Applies Mastersoft's rounding and step table.", "scaled %, table row, term grade"),
+    step("TC-009 Threshold Review", "decision", "Checks the passing threshold and flags edge cases.", "pass/fail result, flagged students"),
+    step("Export Mastersoft .xlsx", "terminal", "Produces the upload file in Mastersoft's row order.", ".xlsx encoding file"),
+  ],
+  system: [
+    step("Table Input", "terminal", "Gradebook grid where marks are typed or pasted.", "raw cell values"),
+    step("Form Validation", "process", "Highlights blank and invalid scores before computing.", "valid / invalid flags"),
+    step("rules.v1.json Engine", "process", "Declarative grading rules loaded by the engine.", "weights, transmutation table"),
+    step("Grade Computation", "process", "Computes term grades and the Final Rating.", "term grades, Final Rating"),
+    step("SheetJS Workbook Generator", "terminal", "Builds the Excel files for download.", "Mastersoft upload workbook"),
+  ],
+  backend: [
+    step("Local Browser Storage", "terminal", "All class data stays on the teacher's computer.", "UI preferences, privacy consent"),
+    step("IndexedDB Course Store", "process", "One record per class and section.", "classes, students, scores"),
+    step("Local JSON Backup / Restore", "process", "Download a class as a file and restore it anywhere.", "class backup JSON"),
+    step("Firebase Hosting Delivery", "terminal", "Serves the app shell; no student data is uploaded.", "static assets over HTTPS"),
+  ],
+};
+
+const tokens = (stack: string) =>
+  stack
+    .split(/,(?![^(]*\))/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+// Repos without a hand-written flow get a short pipeline built from their name, functions and stack.
+function genericSteps(project: ProjectRecord, category: FlowCategory): Omit<FlowStep, "id">[] {
+  const front = tokens(project.frontend_stack);
+  const back = tokens(project.backend_stack);
+  const host = hostingOf(project.live_url);
+  if (category === "user") {
+    const fns = project.functions.slice(0, 3);
+    const middle = fns.length > 0 ? fns : ["Provide input", "Core processing", "Review result"];
+    return [
+      step(`Open ${project.name}`, "terminal", "Entry point of the product.", "user session"),
+      ...middle.map((label, i) =>
+        step(label, i === middle.length - 1 && fns.length === 0 ? "decision" : "process", "A core capability of the project.", "user input and results")
+      ),
+      step("Finish & Review Output", "terminal", "The person leaves with a result.", "output / saved data"),
+    ].slice(0, 5);
+  }
+  if (category === "system") {
+    return [
+      step(`Client UI${front.length ? ` · ${front.slice(0, 2).join(", ")}` : ""}`, "terminal", "Renders screens and captures input.", "user events"),
+      step("Application State & Logic", "process", "Validates input and applies business rules.", "validated actions"),
+      step(back.length ? `Services · ${back[0]}` : "Local Processing", "process", "Does the work that needs data or compute.", "requests and results"),
+      step(`Data Layer${back[1] ? ` · ${back[1]}` : ""}`, "process", "Reads and writes persistent data.", "records"),
+      step("Response / Render", "terminal", "Results flow back to the interface.", "view state"),
+    ];
+  }
+  return [
+    step("Request / Event", "terminal", "Something asks for or changes data.", "request payload"),
+    step(`Storage${back[0] ? ` · ${back[0]}` : ""}`, "process", "Primary data store.", "records"),
+    step(`Persistence${back[1] ? ` · ${back[1]}` : " & Backup"}`, "process", "Secondary storage, caching or backup.", "snapshots, cache"),
+    step(`Hosting${host ? ` · ${host}` : ""}`, "process", "Where the production build is served from.", "static assets / API"),
+    step("Monitoring · Health Checks", "terminal", "Silph DevOps pings the live URL.", "status, latency"),
+  ];
 }
 
-// Every project opens with a starter process flow, never an empty canvas.
-export function defaultDiagram(projectId: string): StoredDiagram {
-  if (projectId === "exam-reviewer-app") {
-    return flow([
-      { id: "start", label: "Start", type: "terminal", x: 0, y: 0 },
-      { id: "login", label: "Student Login", type: "process", x: 230, y: 0 },
-      { id: "select", label: "Select Exam", type: "process", x: 460, y: 0 },
-      { id: "answer", label: "Answer Sheet", type: "process", x: 690, y: 0 },
-      { id: "score", label: "Score Summary", type: "process", x: 920, y: 0 },
-      { id: "end", label: "End", type: "terminal", x: 1150, y: 0 },
-    ]);
-  }
-  if (projectId === "mastersoft-grade-encoding-assistant") {
-    return flow([
-      { id: "course", label: "Faculty Course Selection", type: "terminal", x: 0, y: 100 },
-      { id: "weights", label: "Set Assessment Weights (CS % & WE %)", type: "process", x: 240, y: 100 },
-      { id: "scores", label: "Enter Student Raw Scores", type: "process", x: 480, y: 100 },
-      { id: "rounding", label: "Double-Rounding & Step Transmutation", type: "process", x: 720, y: 100 },
-      { id: "threshold", label: "TC-009 Passing Threshold Check", type: "decision", x: 960, y: 80 },
-      { id: "export", label: "Export Mastersoft .xlsx & Save IDB", type: "terminal", x: 1200, y: 100 },
-    ]);
-  }
-  return flow([
-    { id: "start", label: "Start", type: "terminal", x: 0, y: 100 },
-    { id: "ingest", label: "Ingest Data / Configuration", type: "process", x: 240, y: 100 },
-    { id: "process", label: "Core Processing", type: "process", x: 480, y: 100 },
-    { id: "validate", label: "Validation / Decision", type: "decision", x: 720, y: 80 },
-    { id: "output", label: "Output & Storage", type: "terminal", x: 960, y: 100 },
-  ]);
+export function getFlow(projectId: string, category: FlowCategory): Flow {
+  const project = getProjects().find((p) => p.id === projectId);
+  const handWritten =
+    projectId === "exam-reviewer-app" ? EXAM_REVIEWER : projectId === "mastersoft-grade-encoding-assistant" ? GRADE_ASSISTANT : null;
+  const steps =
+    handWritten?.[category] ??
+    genericSteps(project ?? { ...SEED_PROJECT, id: projectId, name: projectId, functions: [], frontend_stack: "", backend_stack: "", live_url: "" }, category);
+  return { category, ...meta[category], steps: withIds(steps) };
 }
 
-// The saved diagram, or the starter flow when nothing (or an empty canvas) was saved.
-export function initialDiagram(projectId: string): StoredDiagram {
-  const saved = loadDiagram(projectId);
-  return saved && saved.nodes.length > 0 ? saved : defaultDiagram(projectId);
+const mermaidLabel = (text: string) => text.replace(/"/g, "'");
+
+// Mermaid flowchart for one category: terminals are stadiums, decisions are diamonds.
+export function getMermaidForCategory(projectId: string, category: FlowCategory): string {
+  const project = getProjects().find((p) => p.id === projectId);
+  const flow = getFlow(projectId, category);
+  const shape = (s: FlowStep) => {
+    const label = mermaidLabel(s.label);
+    return s.kind === "terminal" ? `${s.id}(["${label}"])` : s.kind === "decision" ? `${s.id}{"${label}"}` : `${s.id}["${label}"]`;
+  };
+  return [`%% ${project?.name ?? projectId} - ${flow.title}`, "flowchart LR", ...flow.steps.map((s, i) => (i === 0 ? `  ${shape(s)}` : `  ${flow.steps[i - 1].id} --> ${shape(s)}`))].join("\n");
 }

@@ -277,9 +277,13 @@ export async function removeCloudProject(workspaceId: string, identifier: string
 
 // ---------------------------------------------------------------- diagrams
 
-export type ProjectDiagram = { id: string; name: string; href: string };
+export type ProjectDiagram = { id: "user" | "system" | "backend"; name: string; href: string };
 
-// The editor currently holds one diagram per project, created on first save, so that is what the tree lists.
+// The Diagrams subtree lists the three read-only flow categories.
 export function getProjectDiagrams(projectId: string): ProjectDiagram[] {
-  return [{ id: "main", name: "Main Architecture", href: `/projects/${projectId}/diagrams` }];
+  return [
+    { id: "user", name: "User Flow", href: `/projects/${projectId}/diagrams?category=user` },
+    { id: "system", name: "System Flow", href: `/projects/${projectId}/diagrams?category=system` },
+    { id: "backend", name: "Backend Flow", href: `/projects/${projectId}/diagrams?category=backend` },
+  ];
 }

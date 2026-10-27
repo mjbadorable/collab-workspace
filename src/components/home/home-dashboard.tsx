@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Clock, Inbox, ListTodo, Network, Palette, Plus } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, Inbox, Landmark, ListTodo, Network, Plus } from "lucide-react";
 import Greeting from "@/components/greeting";
 import { priorityOptions, statusOptions } from "@/components/work-items/work-items-view";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
@@ -18,11 +18,11 @@ import ProjectCard from "./project-card";
 const launchpad = (projectId: string) => [
   {
     href: `/projects/${projectId}/diagrams`,
-    title: "React Flow Architecture",
-    body: "Map flows and ERDs on the interactive canvas.",
+    title: "Process Flowcharts",
+    body: "User, system and backend flows for this project.",
     icon: Network,
   },
-  { href: `/projects/${projectId}/designs`, title: "UI Design Canvas", body: "Auto-layout mockups linked to your tasks.", icon: Palette },
+  { href: `/projects/${projectId}/architecture`, title: "System Architecture", body: "Layers, data flow and hosting at a glance.", icon: Landmark },
 ];
 
 // Each card deep-links to the project's work items filtered by that status.

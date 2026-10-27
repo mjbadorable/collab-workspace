@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
   BookOpen,
@@ -9,17 +9,19 @@ import {
   ChevronRight,
   Check,
   ChevronsUpDown,
+  Cog,
+  Database,
   Home,
   Landmark,
   Layers,
   ListTodo,
   Network,
   LogOut,
-  Palette,
   Pencil,
   Plus,
   Settings,
   Trash2,
+  User,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -35,10 +37,11 @@ import { useProjects } from "@/lib/projects-context";
 const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Home", href: "/", icon: Home },
   { label: "Projects", href: "/projects", icon: Layers },
-  { label: "Design", href: "/design", icon: Palette },
   { label: "Trash", href: "/trash", icon: Trash2 },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
+
+const categoryIcons: Record<"user" | "system" | "backend", LucideIcon> = { user: User, system: Cog, backend: Database };
 
 // The five project sections plus Settings. Cycles, Modules and Dashboards are intentionally not linked.
 const projectNav: { label: string; slug: string; icon: LucideIcon }[] = [
@@ -46,7 +49,6 @@ const projectNav: { label: string; slug: string; icon: LucideIcon }[] = [
   { label: "Work items", slug: "work-items", icon: ListTodo },
   { label: "System Architecture", slug: "architecture", icon: Landmark },
   { label: "Flowchart / Diagrams", slug: "diagrams", icon: Network },
-  { label: "Designs", slug: "designs", icon: Palette },
   { label: "Settings", slug: "settings", icon: Settings },
 ];
 
@@ -67,6 +69,7 @@ export default function Sidebar({
   onEditProfile: () => void;
 }) {
   const pathname = usePathname();
+  const activeCategory = useSearchParams().get("category") ?? "user";
   const router = useRouter();
   const { openDialog } = useNewWorkItem();
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -264,8 +267,11 @@ export default function Sidebar({
                               <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-neutral-200 pl-2">
                                 {getProjectDiagrams(project.id).map((d) => (
                                   <li key={d.id}>
-                                    <Link href={d.href} onClick={onNavigate} className={itemClass(false)}>
-                                      <Network className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
+                                    <Link href={d.href} onClick={onNavigate} className={itemClass(pathname === href && activeCategory === d.id)}>
+                                      {(() => {
+                                        const CategoryIcon = categoryIcons[d.id];
+                                        return <CategoryIcon className="h-3.5 w-3.5 text-neutral-400" aria-hidden />;
+                                      })()}
                                       <span className="truncate">{d.name}</span>
                                     </Link>
                                   </li>

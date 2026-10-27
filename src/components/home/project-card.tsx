@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
-import { BarChart3, ExternalLink, GitFork, Network, Palette, Pencil, RefreshCw, SquareCheckBig, Users } from "lucide-react";
+import { BarChart3, ExternalLink, GitFork, Landmark, Network, Pencil, RefreshCw, SquareCheckBig, Users } from "lucide-react";
 import type { ProjectRecord } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
 import type { StoredWorkItem } from "@/lib/work-items-storage";
@@ -139,7 +139,7 @@ function HealthMonitor({ project }: { project: ProjectRecord }) {
 const shortcuts = [
   { label: "Work items", slug: "work-items", icon: SquareCheckBig },
   { label: "Diagrams", slug: "diagrams", icon: Network },
-  { label: "Designs", slug: "designs", icon: Palette },
+  { label: "Architecture", slug: "architecture", icon: Landmark },
 ];
 
 export default function ProjectCard({ project, items }: { project: ProjectRecord; items: StoredWorkItem[] | null }) {
