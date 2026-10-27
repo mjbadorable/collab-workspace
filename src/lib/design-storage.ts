@@ -1,3 +1,4 @@
+import { getProjects } from "./projects";
 import { mockUser } from "./mock-data";
 
 export type NodeType = "frame" | "rectangle" | "text" | "button";
@@ -107,7 +108,7 @@ export function addChildNode(nodes: CanvasNode[], parentId: string, child: Canva
 }
 
 // A static starter mockup of the quiz and bubble sheet screens for the Exam Reviewer App.
-function seedFile(): DesignFile {
+function seedExamReviewerDesign(): DesignFile {
   let n = 0;
   const node = (type: NodeType, overrides: Partial<CanvasNode> = {}) =>
     makeNode(type, { id: `seed-node-${++n}`, ...overrides });
@@ -223,18 +224,129 @@ function seedFile(): DesignFile {
   };
 }
 
-// Returns every file, including soft-deleted ones, so saving never drops them.
+// A static starter mockup of the Grade Encoding Assistant: setup card, results table and actions.
+function seedGradeAssistantDesign(): DesignFile {
+  let n = 0;
+  const node = (type: NodeType, overrides: Partial<CanvasNode> = {}) =>
+    makeNode(type, { id: `seed-mgea-node-${++n}`, ...overrides });
+  const text = (value: string, fontSize: number, fill = "#111827") => node("text", { name: value, text: value, fontSize, fill });
+
+  const cell = (value: string, width: number, fill = "#111827") =>
+    node("frame", {
+      name: `Cell ${value}`,
+      padding: 10,
+      fill: "#ffffff",
+      widthMode: "fixed",
+      width,
+      children: [text(value, 14, fill)],
+    });
+  const columns = [320, 200, 200, 200];
+  const row = (name: string, values: string[], fill?: string) =>
+    node("frame", {
+      name,
+      direction: "row",
+      gap: 0,
+      padding: 0,
+      fill: "#ffffff",
+      children: values.map((v, i) => cell(v, columns[i], fill)),
+    });
+
+  const header = node("frame", {
+    name: "Header",
+    direction: "row",
+    padding: 24,
+    align: "center",
+    distribute: "between",
+    widthMode: "fixed",
+    width: 1440,
+    children: [text("Mastersoft Grade Encoding Assistant · AY 2026-2027", 24)],
+  });
+
+  const setupCard = node("frame", {
+    name: "Setup Card",
+    gap: 8,
+    padding: 24,
+    widthMode: "fixed",
+    width: 960,
+    children: [text("Assessment Setup", 18), text("CS: 50% · WE: 50% · Transmutation: Step Table", 14, "#6b7280")],
+  });
+
+  const table = node("frame", {
+    name: "Spreadsheet Table",
+    gap: 0,
+    padding: 0,
+    fill: "#e5e7eb",
+    children: [
+      row("Header Row", ["Student", "Raw Marks", "Transmuted %", "Final Rating"], "#6b7280"),
+      row("Juan Dela Cruz", ["Juan Dela Cruz", "87 / 100", "92", "1.75"]),
+      row("Maria Santos", ["Maria Santos", "94 / 100", "96", "1.25"]),
+    ],
+  });
+
+  const actions = node("frame", {
+    name: "Actions",
+    direction: "row",
+    gap: 12,
+    padding: 0,
+    fill: "#f9fafb",
+    children: [
+      node("button", { name: "Export", text: "Export Upload .xlsx" }),
+      node("button", { name: "Save", text: "Save to IndexedDB", fill: "#111827" }),
+    ],
+  });
+
+  const body = node("frame", {
+    name: "Body",
+    gap: 24,
+    padding: 32,
+    fill: "#f9fafb",
+    widthMode: "fixed",
+    heightMode: "fixed",
+    width: 1440,
+    height: 823,
+    children: [setupCard, table, actions],
+  });
+
+  const screen = node("frame", {
+    name: "Gradebook Screen",
+    gap: 0,
+    padding: 0,
+    fill: "#f9fafb",
+    widthMode: "fixed",
+    heightMode: "fixed",
+    width: 1440,
+    height: 900,
+    children: [header, body],
+  });
+
+  return {
+    id: "seed-design-grade-ui",
+    project_id: "mastersoft-grade-encoding-assistant",
+    name: "Grade Encoding Assistant — Gradebook UI",
+    updated_by: mockUser.name,
+    updated_at: "2026-10-27T09:00:00.000Z",
+    created_at: "2026-10-27T09:00:00.000Z",
+    deleted_at: null,
+    nodes: [screen],
+  };
+}
+
+const seedDesigns = () => [seedExamReviewerDesign(), seedGradeAssistantDesign()];
+
+// Returns every file, including soft-deleted ones, so saving never drops them. Seed files that have not been
+// saved yet are merged in, each belonging to exactly one project.
 export function loadDesignFiles(): DesignFile[] {
+  let stored: DesignFile[] = [];
   try {
     const raw = localStorage.getItem(storageKey);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) stored = parsed;
     }
   } catch {
     // corrupt JSON or storage unavailable: fall back to the seed data
   }
-  return [seedFile()];
+  return [...stored, ...seedDesigns().filter((s) => !stored.some((f) => f.id === s.id))];
 }
 
 export function loadDesignFile(id: string): DesignFile | null {
@@ -277,4 +389,31 @@ export function createDesignFile(projectId: string, name: string): DesignFile {
   };
   saveDesignFile(file);
   return file;
+}
+
+// The project's primary design file: its first live file, or a new starter frame named after the project.
+export function getProjectDesignFile(projectId: string): DesignFile {
+  const existing = loadDesignFiles().find((f) => f.project_id === projectId && !f.deleted_at);
+  if (existing) return existing;
+
+  const project = getProjects().find((p) => p.id === projectId);
+  const file = createDesignFile(projectId, `${project?.name ?? projectId} — UI`);
+  const title = makeNode("text", {
+    name: "Project name",
+    text: project?.name ?? projectId,
+    fontSize: 28,
+    fill: "#111827",
+  });
+  const identifier = makeNode("text", {
+    name: "Identifier",
+    text: project?.identifier ?? projectId.slice(0, 3).toUpperCase(),
+    fontSize: 14,
+    fill: "#6b7280",
+  });
+  const withContent: DesignFile = {
+    ...file,
+    nodes: file.nodes.map((frame) => ({ ...frame, name: "Home Screen", children: [title, identifier] })),
+  };
+  saveDesignFile(withContent);
+  return withContent;
 }

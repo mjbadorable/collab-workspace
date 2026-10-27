@@ -35,7 +35,7 @@ import { ensureCloudProject } from "@/lib/cloud-projects";
 import {
   defaultDiagram,
   fetchCloudDiagram,
-  loadDiagram,
+  initialDiagram,
   saveCloudDiagram,
   saveDiagram,
   toStored,
@@ -228,7 +228,7 @@ function Editor({ projectId, initial, onSave, cloud }: EditorProps) {
 
 // Loads the diagram from the cloud or localStorage, then mounts the editor with it.
 function DiagramLoader({ projectId, workspaceId }: { projectId: string; workspaceId: string | null }) {
-  const [localInitial] = useState(() => (workspaceId ? null : (loadDiagram(projectId) ?? defaultDiagram(projectId))));
+  const [localInitial] = useState(() => (workspaceId ? null : initialDiagram(projectId)));
   const [cloudInitial, setCloudInitial] = useState<StoredDiagram | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cloudRef = useRef<{ projectUuid: string; diagramId: string | null } | null>(null);

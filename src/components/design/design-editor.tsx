@@ -169,7 +169,7 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
     <div className="flex h-full flex-col">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 px-3 py-1.5 text-sm">
         <div className="flex min-w-0 items-center gap-1">
-          <Link href="/design" aria-label="Back to design files" className="rounded p-1 text-neutral-500 hover:bg-neutral-100">
+          <Link href={`/projects/${projectId}`} aria-label="Back to project overview" className="rounded p-1 text-neutral-500 hover:bg-neutral-100">
             <ChevronLeft className="h-4 w-4" />
           </Link>
           <span className="truncate font-medium">{file.name}</span>
@@ -271,8 +271,8 @@ function LoadedEditor({ projectId, fileId }: { projectId: string; fileId: string
     return (
       <div className="flex h-full flex-col items-center justify-center px-6 text-center">
         <p className="text-sm font-medium">Design file not found</p>
-        <Link href="/design" className="mt-2 text-sm text-indigo-600 hover:underline">
-          Back to design files
+        <Link href={`/projects/${projectId}`} className="mt-2 text-sm text-red-600 hover:underline">
+          Back to project overview
         </Link>
       </div>
     );

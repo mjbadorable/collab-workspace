@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ExternalLink, GitFork } from "lucide-react";
+import { ArrowRight, Circle, Database, Diamond, ExternalLink, GitFork, Square, type LucideIcon } from "lucide-react";
 import HealthPill from "@/components/home/health-pill";
 import LiveWorkItems from "@/components/home/live-work-items";
 import { progressOf } from "@/components/home/project-card";
+import { initialDiagram } from "@/lib/diagram-storage";
 import { loadDesignFiles } from "@/lib/design-storage";
 import { techRows } from "@/lib/project-stack";
 import { getProjectDiagrams, type ProjectRecord } from "@/lib/projects";
@@ -78,6 +79,66 @@ function DesignThumbnail() {
         <div className="h-4 w-1/3 rounded bg-red-500" />
       </div>
     </div>
+  );
+}
+
+const stepIcons: Record<string, { icon: LucideIcon; label: string }> = {
+  terminal: { icon: Circle, label: "Start / End" },
+  process: { icon: Square, label: "Process" },
+  decision: { icon: Diamond, label: "Decision" },
+  entity: { icon: Database, label: "Table" },
+};
+
+const stepTone = (type: string | undefined) =>
+  type === "decision"
+    ? "border-amber-300 bg-amber-50 text-amber-600"
+    : type === "terminal"
+      ? "border-neutral-300 bg-neutral-100 text-neutral-700"
+      : "border-red-200 bg-red-50 text-red-600";
+
+// The project's saved flowchart (or its starter flow) as a left-to-right pipeline of numbered steps.
+function FlowchartPipeline({ projectId }: { projectId: string }) {
+  const [steps] = useState(() =>
+    initialDiagram(projectId)
+      .nodes.filter((n) => n.type !== "text")
+      .sort((a, b) => a.position.x - b.position.x || a.position.y - b.position.y)
+  );
+
+  return (
+    <section aria-labelledby="ov-flow">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="ov-flow" className="text-sm font-semibold text-neutral-700">
+          Process Flowchart
+        </h2>
+        <Link
+          href={`/projects/${projectId}/diagrams`}
+          className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+        >
+          Open Full Flowchart Canvas <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+        </Link>
+      </div>
+      <ol className="mt-3 flex items-stretch overflow-x-auto rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+        {steps.map((step, i) => {
+          const kind = stepIcons[step.type ?? "process"] ?? stepIcons.process;
+          const Icon = kind.icon;
+          return (
+            <li key={step.id} className="flex shrink-0 items-center">
+              <div className="flex w-40 flex-col items-center gap-2 text-center">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-xs font-semibold text-white">
+                  {i + 1}
+                </span>
+                <span className={`flex h-9 w-9 items-center justify-center rounded-md border ${stepTone(step.type)}`}>
+                  <Icon className="h-4 w-4" aria-hidden />
+                  <span className="sr-only">{kind.label}</span>
+                </span>
+                <span className="text-xs font-medium leading-snug text-neutral-800">{step.data.label}</span>
+              </div>
+              {i < steps.length - 1 && <ArrowRight className="mx-1 h-4 w-4 shrink-0 text-neutral-300" aria-hidden />}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }
 
@@ -191,6 +252,8 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
           </table>
         </div>
       </section>
+
+      <FlowchartPipeline key={project.id} projectId={project.id} />
 
       <section aria-label="Project sections" className="grid gap-4 sm:grid-cols-2">
         <SectionCard emoji="📋" title="Work Items" href={`${base}/work-items`} action="Open Kanban Board">

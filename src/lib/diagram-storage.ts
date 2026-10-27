@@ -105,23 +105,10 @@ export async function restoreCloudDiagram(id: string): Promise<void> {
   if (data.length === 0) throw new Error("That diagram could not be restored.");
 }
 
-export function defaultDiagram(projectId: string): StoredDiagram {
-  if (projectId !== "exam-reviewer-app") return { nodes: [], edges: [] };
+type Step = { id: string; label: string; type: "terminal" | "process" | "decision"; x: number; y: number };
 
-  const step = (id: string, label: string, type: string, i: number): DiagramNode => ({
-    id,
-    type,
-    position: { x: i * 230, y: 0 },
-    data: { label },
-  });
-  const nodes = [
-    step("start", "Start", "terminal", 0),
-    step("login", "Student Login", "process", 1),
-    step("select", "Select Exam", "process", 2),
-    step("answer", "Answer Sheet", "process", 3),
-    step("score", "Score Summary", "process", 4),
-    step("end", "End", "terminal", 5),
-  ];
+function flow(steps: Step[]): StoredDiagram {
+  const nodes: DiagramNode[] = steps.map(({ id, label, type, x, y }) => ({ id, type, position: { x, y }, data: { label } }));
   const edges: Edge[] = nodes.slice(1).map((n, i) => ({
     id: `e-${nodes[i].id}-${n.id}`,
     source: nodes[i].id,
@@ -130,4 +117,41 @@ export function defaultDiagram(projectId: string): StoredDiagram {
     targetHandle: "left",
   }));
   return { nodes, edges };
+}
+
+// Every project opens with a starter process flow, never an empty canvas.
+export function defaultDiagram(projectId: string): StoredDiagram {
+  if (projectId === "exam-reviewer-app") {
+    return flow([
+      { id: "start", label: "Start", type: "terminal", x: 0, y: 0 },
+      { id: "login", label: "Student Login", type: "process", x: 230, y: 0 },
+      { id: "select", label: "Select Exam", type: "process", x: 460, y: 0 },
+      { id: "answer", label: "Answer Sheet", type: "process", x: 690, y: 0 },
+      { id: "score", label: "Score Summary", type: "process", x: 920, y: 0 },
+      { id: "end", label: "End", type: "terminal", x: 1150, y: 0 },
+    ]);
+  }
+  if (projectId === "mastersoft-grade-encoding-assistant") {
+    return flow([
+      { id: "course", label: "Faculty Course Selection", type: "terminal", x: 0, y: 100 },
+      { id: "weights", label: "Set Assessment Weights (CS % & WE %)", type: "process", x: 240, y: 100 },
+      { id: "scores", label: "Enter Student Raw Scores", type: "process", x: 480, y: 100 },
+      { id: "rounding", label: "Double-Rounding & Step Transmutation", type: "process", x: 720, y: 100 },
+      { id: "threshold", label: "TC-009 Passing Threshold Check", type: "decision", x: 960, y: 80 },
+      { id: "export", label: "Export Mastersoft .xlsx & Save IDB", type: "terminal", x: 1200, y: 100 },
+    ]);
+  }
+  return flow([
+    { id: "start", label: "Start", type: "terminal", x: 0, y: 100 },
+    { id: "ingest", label: "Ingest Data / Configuration", type: "process", x: 240, y: 100 },
+    { id: "process", label: "Core Processing", type: "process", x: 480, y: 100 },
+    { id: "validate", label: "Validation / Decision", type: "decision", x: 720, y: 80 },
+    { id: "output", label: "Output & Storage", type: "terminal", x: 960, y: 100 },
+  ]);
+}
+
+// The saved diagram, or the starter flow when nothing (or an empty canvas) was saved.
+export function initialDiagram(projectId: string): StoredDiagram {
+  const saved = loadDiagram(projectId);
+  return saved && saved.nodes.length > 0 ? saved : defaultDiagram(projectId);
 }
