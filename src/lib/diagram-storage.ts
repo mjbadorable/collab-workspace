@@ -1,5 +1,7 @@
 import type { Edge } from "@xyflow/react";
 import type { DiagramNode } from "@/components/diagrams/nodes";
+import type { Diagram, Json } from "./database.types";
+import { supabase } from "./supabase";
 
 // deleted_at mirrors the diagrams table; nothing sets it yet, but the Trash view honours it.
 export type StoredDiagram = { nodes: DiagramNode[]; edges: Edge[]; deleted_at?: string | null };
@@ -42,6 +44,65 @@ export function saveDiagram(projectId: string, diagram: StoredDiagram): void {
   } catch {
     // quota exceeded or storage blocked: the editor keeps working in memory
   }
+}
+
+// ---------------------------------------------------------------- cloud (Supabase)
+// A project has one diagram for now: the first non-deleted row, created on the first save.
+
+function client() {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  return supabase;
+}
+
+export async function fetchCloudDiagram(projectUuid: string): Promise<{ id: string; diagram: StoredDiagram } | null> {
+  const { data, error } = await client()
+    .from("diagrams")
+    .select("*")
+    .eq("project_id", projectUuid)
+    .is("deleted_at", null)
+    .order("updated_at")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  if (!Array.isArray(data.nodes) || !Array.isArray(data.edges)) throw new Error("The saved diagram is malformed.");
+  return { id: data.id, diagram: { nodes: data.nodes as unknown as DiagramNode[], edges: data.edges as unknown as Edge[] } };
+}
+
+// Updates the row, or inserts it when the project has no diagram yet. Returns the row id.
+export async function saveCloudDiagram(projectUuid: string, id: string | null, diagram: StoredDiagram): Promise<string> {
+  const nodes = diagram.nodes as unknown as Json;
+  const edges = diagram.edges as unknown as Json;
+  if (id) {
+    const { data, error } = await client().from("diagrams").update({ nodes, edges }).eq("id", id).select("id");
+    if (error) throw new Error(error.message);
+    if (data.length === 0) throw new Error("The diagram could not be saved.");
+    return id;
+  }
+  const { data, error } = await client()
+    .from("diagrams")
+    .insert({ project_id: projectUuid, name: "User flow", type: "flowchart", nodes, edges })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return data.id;
+}
+
+export async function fetchCloudDeletedDiagrams(projectUuids: string[]): Promise<Diagram[]> {
+  if (projectUuids.length === 0) return [];
+  const { data, error } = await client()
+    .from("diagrams")
+    .select("*")
+    .in("project_id", projectUuids)
+    .not("deleted_at", "is", null);
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function restoreCloudDiagram(id: string): Promise<void> {
+  const { data, error } = await client().from("diagrams").update({ deleted_at: null }).eq("id", id).select("id");
+  if (error) throw new Error(error.message);
+  if (data.length === 0) throw new Error("That diagram could not be restored.");
 }
 
 export function defaultDiagram(projectId: string): StoredDiagram {

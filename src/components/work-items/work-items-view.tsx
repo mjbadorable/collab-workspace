@@ -3,15 +3,13 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronRight, ListChecks, Plus, Trash2 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 import { initials, mockProjects, mockUser } from "@/lib/mock-data";
+import { useStorageTarget } from "@/lib/storage-target";
 import { useIsClient } from "@/lib/use-is-client";
+import { useWorkItems } from "@/lib/use-work-items";
 import {
-  addWorkItem,
-  loadWorkItems,
   projectIdentifier,
-  saveWorkItems,
-  softDeleteWorkItem,
-  updateWorkItem,
   workItemKey,
   type NewWorkItemInput,
   type StoredWorkItem,
@@ -74,19 +72,23 @@ function PillSelect<T extends string>({
   );
 }
 
+type Me = { id: string; name: string };
+
 function WorkItemRow({
   item,
   projectId,
+  me,
   onChange,
   onDelete,
 }: {
   item: StoredWorkItem;
   projectId: string;
+  me: Me;
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onDelete: () => void;
 }) {
   const key = workItemKey(projectId, item.seq);
-  const mine = item.assignee_id === mockUser.id;
+  const mine = item.assignee_id === me.id;
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
 
   return (
@@ -115,14 +117,14 @@ function WorkItemRow({
       />
       <button
         type="button"
-        onClick={() => onChange({ assignee_id: mine ? null : mockUser.id })}
-        title={mine ? `Assigned to ${mockUser.name} (click to unassign)` : "Unassigned (click to assign to me)"}
+        onClick={() => onChange({ assignee_id: mine ? null : me.id })}
+        title={mine ? `Assigned to ${me.name} (click to unassign)` : "Unassigned (click to assign to me)"}
         aria-label={mine ? `Unassign ${key}` : `Assign ${key} to me`}
         className="w-24 shrink-0 text-left"
       >
         {mine ? (
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700">
-            {initials(mockUser.name)}
+            {initials(me.name)}
           </span>
         ) : (
           <span className="rounded-full border border-dashed border-neutral-300 px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100">
@@ -231,13 +233,16 @@ function NewItemForm({
   );
 }
 
-function WorkItems({ projectId }: { projectId: string }) {
-  const [items, setItems] = useState<StoredWorkItem[]>(() => loadWorkItems(projectId));
+function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId: string | null }) {
+  const { items: allItems, error, add, update, softDelete } = useWorkItems(projectId, workspaceId);
+  const items = allItems ?? [];
   const [filter, setFilter] = useState<Filter>("all");
   const { open, openDialog, closeDialog } = useNewWorkItem();
+  const { user } = useAuth();
   const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => saveWorkItems(projectId, items), [projectId, items]);
+  // In the cloud, assignees are real auth users; local preview keeps the mock user.
+  const me: Me =
+    workspaceId && user ? { id: user.id, name: (user.email ?? "Me").split("@")[0].replace(/[._-]+/g, " ") } : mockUser;
 
   // Native <dialog> gives focus trapping, Esc-to-close and an inert page behind it.
   useEffect(() => {
@@ -271,6 +276,12 @@ function WorkItems({ projectId }: { projectId: string }) {
         </button>
       </header>
 
+      {error && (
+        <p role="alert" className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
+
       <div role="tablist" aria-label="Filter by status" className="flex gap-1 border-b border-neutral-200 px-4 py-2">
         {filters.map((f) => {
           const active = filter === f.value;
@@ -295,7 +306,9 @@ function WorkItems({ projectId }: { projectId: string }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {visible.length === 0 ? (
+        {allItems === null ? (
+          <p className="px-6 py-16 text-center text-sm text-neutral-500">Loading work items…</p>
+        ) : visible.length === 0 ? (
           <div className="flex flex-col items-center px-6 py-16 text-center">
             <ListChecks className="h-8 w-8 text-neutral-400" />
             <p className="mt-3 text-sm font-medium">{filter === "all" ? "No work items yet" : "Nothing here"}</p>
@@ -310,8 +323,9 @@ function WorkItems({ projectId }: { projectId: string }) {
                 key={item.id}
                 item={item}
                 projectId={projectId}
-                onChange={(patch) => setItems((prev) => updateWorkItem(prev, item.id, patch))}
-                onDelete={() => setItems((prev) => softDeleteWorkItem(prev, item.id))}
+                me={me}
+                onChange={(patch) => update(item.id, patch)}
+                onDelete={() => softDelete(item.id)}
               />
             ))}
           </ul>
@@ -330,7 +344,7 @@ function WorkItems({ projectId }: { projectId: string }) {
             projectKey={projectIdentifier(projectId)}
             onCancel={closeDialog}
             onSubmit={(input) => {
-              setItems((prev) => addWorkItem(prev, projectId, input));
+              add(input);
               setFilter("all");
               closeDialog();
             }}
@@ -343,5 +357,9 @@ function WorkItems({ projectId }: { projectId: string }) {
 
 export default function WorkItemsView({ projectId }: { projectId: string }) {
   const mounted = useIsClient();
-  return mounted ? <WorkItems projectId={projectId} /> : <div className="h-full" />;
+  const target = useStorageTarget();
+  if (!mounted || target.mode === "loading") return <div className="h-full" />;
+  const workspaceId = target.mode === "cloud" ? target.workspaceId : null;
+  // Remount when the data source changes (sign-in, sign-out, workspace switch).
+  return <WorkItems key={workspaceId ?? "local"} projectId={projectId} workspaceId={workspaceId} />;
 }

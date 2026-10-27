@@ -26,14 +26,23 @@ import {
   Download,
   Hand,
   MousePointer2,
-  RefreshCw,
   Square,
   Table2,
   Type,
   type LucideIcon,
 } from "lucide-react";
-import { defaultDiagram, loadDiagram, saveDiagram, toStored } from "@/lib/diagram-storage";
+import { ensureCloudProject } from "@/lib/cloud-projects";
+import {
+  defaultDiagram,
+  fetchCloudDiagram,
+  loadDiagram,
+  saveCloudDiagram,
+  saveDiagram,
+  toStored,
+  type StoredDiagram,
+} from "@/lib/diagram-storage";
 import { mockProjects } from "@/lib/mock-data";
+import { useStorageTarget } from "@/lib/storage-target";
 import { useIsClient } from "@/lib/use-is-client";
 import { nodeTypes, type DiagramNode } from "./nodes";
 
@@ -49,8 +58,15 @@ const shapes: { type: string; label: string; icon: LucideIcon; data: DiagramNode
 
 const defaultEdgeOptions = { markerEnd: { type: MarkerType.ArrowClosed } };
 
-function Editor({ projectId }: { projectId: string }) {
-  const [initial] = useState(() => loadDiagram(projectId) ?? defaultDiagram(projectId));
+type EditorProps = {
+  projectId: string;
+  initial: StoredDiagram;
+  // Resolves to false when the write failed.
+  onSave: (diagram: StoredDiagram) => Promise<boolean>;
+  cloud: boolean;
+};
+
+function Editor({ projectId, initial, onSave, cloud }: EditorProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState<DiagramNode>(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initial.edges);
   const [tool, setTool] = useState<Tool>("select");
@@ -60,16 +76,22 @@ function Editor({ projectId }: { projectId: string }) {
 
   const snapshot = useMemo(() => JSON.stringify(toStored(nodes, edges)), [nodes, edges]);
   const [savedSnapshot, setSavedSnapshot] = useState(() => JSON.stringify(toStored(initial.nodes, initial.edges)));
+  const [failedSnapshot, setFailedSnapshot] = useState<string | null>(null);
+  const onSaveRef = useRef(onSave);
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
 
-  // Debounced autosave to localStorage.
+  // Debounced autosave (400ms), so a drag becomes one write rather than one per pixel.
   useEffect(() => {
     if (snapshot === savedSnapshot) return;
-    const t = setTimeout(() => {
-      saveDiagram(projectId, JSON.parse(snapshot));
-      setSavedSnapshot(snapshot);
+    const t = setTimeout(async () => {
+      const ok = await onSaveRef.current(JSON.parse(snapshot));
+      if (ok) setSavedSnapshot(snapshot);
+      else setFailedSnapshot(snapshot);
     }, 400);
     return () => clearTimeout(t);
-  }, [snapshot, savedSnapshot, projectId]);
+  }, [snapshot, savedSnapshot]);
 
   const onConnect = useCallback((c: Connection) => setEdges((es) => addEdge(c, es)), [setEdges]);
 
@@ -101,6 +123,7 @@ function Editor({ projectId }: { projectId: string }) {
 
   const projectName = mockProjects.find((p) => p.id === projectId)?.name ?? projectId;
   const saved = snapshot === savedSnapshot;
+  const failed = !saved && snapshot === failedSnapshot;
   const hand = tool === "hand";
 
   const toolButton = (active: boolean) =>
@@ -119,21 +142,19 @@ function Editor({ projectId }: { projectId: string }) {
           <span className="truncate font-medium text-neutral-900">User flow</span>
         </nav>
         <div className="flex shrink-0 items-center gap-2">
+          <span className="text-xs text-neutral-500">{cloud ? "Cloud" : "Local preview"}</span>
           <span
+            role="status"
             className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-              saved ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+              saved
+                ? "bg-emerald-50 text-emerald-700"
+                : failed
+                  ? "bg-red-50 text-red-700"
+                  : "bg-amber-50 text-amber-700"
             }`}
           >
-            {saved ? "Saved" : "Saving…"}
+            {saved ? "Saved" : failed ? "Not saved" : "Saving…"}
           </span>
-          <button
-            type="button"
-            disabled
-            title="Cloud sync arrives with the Supabase integration"
-            className="flex items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 py-1 text-neutral-400"
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Sync
-          </button>
           <button
             type="button"
             onClick={exportJson}
@@ -205,14 +226,71 @@ function Editor({ projectId }: { projectId: string }) {
   );
 }
 
+// Loads the diagram from the cloud or localStorage, then mounts the editor with it.
+function DiagramLoader({ projectId, workspaceId }: { projectId: string; workspaceId: string | null }) {
+  const [localInitial] = useState(() => (workspaceId ? null : (loadDiagram(projectId) ?? defaultDiagram(projectId))));
+  const [cloudInitial, setCloudInitial] = useState<StoredDiagram | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const cloudRef = useRef<{ projectUuid: string; diagramId: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const projectUuid = await ensureCloudProject(workspaceId, projectId);
+        const found = await fetchCloudDiagram(projectUuid);
+        if (cancelled) return;
+        cloudRef.current = { projectUuid, diagramId: found?.id ?? null };
+        // With no saved row yet, show the starter flow; the row is only created on the first edit.
+        setCloudInitial(found?.diagram ?? defaultDiagram(projectId));
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load the diagram.");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, projectId]);
+
+  const onSave = async (diagram: StoredDiagram): Promise<boolean> => {
+    if (!workspaceId) {
+      saveDiagram(projectId, diagram);
+      return true;
+    }
+    const ref = cloudRef.current;
+    if (!ref) return false;
+    try {
+      ref.diagramId = await saveCloudDiagram(ref.projectUuid, ref.diagramId, diagram);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const initial = workspaceId ? cloudInitial : localInitial;
+  if (error) {
+    return (
+      <p role="alert" className="m-6 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        {error}
+      </p>
+    );
+  }
+  if (!initial) return <p className="px-6 py-16 text-center text-sm text-neutral-500">Loading diagram…</p>;
+  return (
+    <ReactFlowProvider>
+      <Editor projectId={projectId} initial={initial} onSave={onSave} cloud={!!workspaceId} />
+    </ReactFlowProvider>
+  );
+}
+
 // localStorage only exists in the browser, so the editor mounts after hydration
 // to keep the server HTML and first client render identical.
 export default function DiagramEditor({ projectId }: { projectId: string }) {
   const mounted = useIsClient();
-  if (!mounted) return <div className="h-full w-full" />;
-  return (
-    <ReactFlowProvider>
-      <Editor projectId={projectId} />
-    </ReactFlowProvider>
-  );
+  const target = useStorageTarget();
+  if (!mounted || target.mode === "loading") return <div className="h-full w-full" />;
+  const workspaceId = target.mode === "cloud" ? target.workspaceId : null;
+  // Remount when the data source changes (sign-in, sign-out, workspace switch).
+  return <DiagramLoader key={workspaceId ?? "local"} projectId={projectId} workspaceId={workspaceId} />;
 }

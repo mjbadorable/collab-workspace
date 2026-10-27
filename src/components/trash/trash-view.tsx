@@ -1,12 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckSquare, Network, RotateCcw, Search, Trash2, type LucideIcon } from "lucide-react";
 import { mockProjects } from "@/lib/mock-data";
 import { relativeTime } from "@/lib/relative-time";
+import { supabase } from "@/lib/supabase";
+import { useStorageTarget } from "@/lib/storage-target";
 import { useIsClient } from "@/lib/use-is-client";
-import { loadDiagram, restoreDiagram, saveDiagram } from "@/lib/diagram-storage";
-import { loadWorkItems, restoreWorkItem, saveWorkItems, workItemKey } from "@/lib/work-items-storage";
+import {
+  fetchCloudDeletedDiagrams,
+  loadDiagram,
+  restoreCloudDiagram,
+  restoreDiagram,
+  saveDiagram,
+} from "@/lib/diagram-storage";
+import {
+  fetchCloudWorkItemsForProjects,
+  loadWorkItems,
+  restoreWorkItem,
+  saveWorkItems,
+  updateCloudWorkItem,
+  workItemKey,
+} from "@/lib/work-items-storage";
 
 type Filter = "all" | "work-item" | "diagram";
 
@@ -31,7 +46,9 @@ const kindMeta: Record<TrashEntry["kind"], { label: string; icon: LucideIcon }> 
   diagram: { label: "Diagram", icon: Network },
 };
 
-function collectTrash(): TrashEntry[] {
+const newestFirst = (entries: TrashEntry[]) => entries.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+
+function collectLocalTrash(): TrashEntry[] {
   const entries: TrashEntry[] = [];
   for (const project of mockProjects) {
     for (const item of loadWorkItems(project.id)) {
@@ -59,10 +76,55 @@ function collectTrash(): TrashEntry[] {
       });
     }
   }
-  return entries.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));
+  return newestFirst(entries);
 }
 
-function restoreEntry(entry: TrashEntry): void {
+// RLS limits every query to workspaces the user belongs to; the explicit workspace filter narrows it to the active one.
+async function collectCloudTrash(workspaceId: string): Promise<TrashEntry[]> {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { data: projects, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .is("deleted_at", null);
+  if (error) throw new Error(error.message);
+
+  const byId = new Map(projects.map((p) => [p.id, p]));
+  const ids = projects.map((p) => p.id);
+  // Keys depend on every item's rank in its project, so live items are fetched too.
+  const [items, diagrams] = await Promise.all([fetchCloudWorkItemsForProjects(ids), fetchCloudDeletedDiagrams(ids)]);
+
+  const entries: TrashEntry[] = [];
+  for (const item of items) {
+    const project = byId.get(item.project_id);
+    if (!item.deleted_at || !project) continue;
+    entries.push({
+      id: item.id,
+      kind: "work-item",
+      projectId: project.id,
+      projectName: project.name,
+      key: `${project.identifier}-${item.seq}`,
+      title: item.title,
+      deletedAt: item.deleted_at,
+    });
+  }
+  for (const diagram of diagrams) {
+    const project = byId.get(diagram.project_id);
+    if (!diagram.deleted_at || !project) continue;
+    entries.push({
+      id: diagram.id,
+      kind: "diagram",
+      projectId: project.id,
+      projectName: project.name,
+      key: null,
+      title: diagram.name,
+      deletedAt: diagram.deleted_at,
+    });
+  }
+  return newestFirst(entries);
+}
+
+async function restoreLocal(entry: TrashEntry): Promise<void> {
   if (entry.kind === "work-item") {
     saveWorkItems(entry.projectId, restoreWorkItem(loadWorkItems(entry.projectId), entry.id));
     return;
@@ -71,21 +133,51 @@ function restoreEntry(entry: TrashEntry): void {
   if (diagram) saveDiagram(entry.projectId, restoreDiagram(diagram));
 }
 
-function Trash() {
-  const [entries, setEntries] = useState<TrashEntry[]>(collectTrash);
+async function restoreCloud(entry: TrashEntry): Promise<void> {
+  if (entry.kind === "work-item") await updateCloudWorkItem(entry.id, { deleted_at: null });
+  else await restoreCloudDiagram(entry.id);
+}
+
+function Trash({ workspaceId }: { workspaceId: string | null }) {
+  // null = the cloud fetch is still in flight.
+  const [entries, setEntries] = useState<TrashEntry[] | null>(() => (workspaceId ? null : collectLocalTrash()));
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    collectCloudTrash(workspaceId).then(
+      (rows) => !cancelled && setEntries(rows),
+      (e) => {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : "Could not load the trash.");
+        setEntries([]);
+      }
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId]);
+
+  const list = entries ?? [];
   const q = query.trim().toLowerCase();
-  const visible = entries.filter(
+  const visible = list.filter(
     (e) =>
       (filter === "all" || e.kind === filter) &&
       (!q || `${e.key ?? ""} ${e.title} ${e.projectName}`.toLowerCase().includes(q))
   );
 
-  const restore = (entry: TrashEntry) => {
-    restoreEntry(entry);
-    setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+  // The row only leaves the list once the restore has actually been written.
+  const restore = async (entry: TrashEntry) => {
+    try {
+      await (workspaceId ? restoreCloud(entry) : restoreLocal(entry));
+      setError(null);
+      setEntries((prev) => prev && prev.filter((e) => e.id !== entry.id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not restore that item.");
+    }
   };
 
   return (
@@ -94,6 +186,12 @@ function Trash() {
       <p className="mt-1 text-sm text-neutral-500">
         Nothing in this workspace is deleted for good. As a workspace admin you can restore anything here.
       </p>
+
+      {error && (
+        <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" aria-label="Filter by type" className="flex gap-1">
@@ -128,10 +226,12 @@ function Trash() {
         </label>
       </div>
 
-      {visible.length === 0 ? (
+      {entries === null ? (
+        <p className="mt-6 py-16 text-center text-sm text-neutral-500">Loading trash…</p>
+      ) : visible.length === 0 ? (
         <div className="mt-6 flex flex-col items-center rounded-lg border border-dashed border-neutral-300 px-6 py-16 text-center">
           <Trash2 className="h-8 w-8 text-neutral-400" />
-          {entries.length === 0 ? (
+          {list.length === 0 ? (
             <>
               <h2 className="mt-3 text-base font-medium">Trash is empty</h2>
               <p className="mt-1 text-sm text-neutral-500">Soft-deleted items will appear here.</p>
@@ -159,7 +259,7 @@ function Trash() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => restore(entry)}
+                  onClick={() => void restore(entry)}
                   aria-label={`Restore ${name}`}
                   className="flex shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-sm text-neutral-700 hover:bg-neutral-100"
                 >
@@ -176,5 +276,9 @@ function Trash() {
 
 export default function TrashView() {
   const mounted = useIsClient();
-  return mounted ? <Trash /> : <div className="h-full" />;
+  const target = useStorageTarget();
+  if (!mounted || target.mode === "loading") return <div className="h-full" />;
+  const workspaceId = target.mode === "cloud" ? target.workspaceId : null;
+  // Remount when the data source changes (sign-in, sign-out, workspace switch).
+  return <Trash key={workspaceId ?? "local"} workspaceId={workspaceId} />;
 }

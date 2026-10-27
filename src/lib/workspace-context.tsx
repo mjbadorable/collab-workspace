@@ -8,9 +8,10 @@ import { supabase } from "./supabase";
 type WorkspaceContext = {
   workspaces: Workspace[];
   current: Workspace | null;
-  // True while a signed-in user's workspaces haven't loaded (including after a failed fetch).
+  // True while a signed-in user's workspaces are being fetched. A failed fetch (offline) ends loading
+  // with no workspaces, which drops the app back to local preview.
   loading: boolean;
-  // Signed in, fetched, and has none: the onboarding modal should show.
+  // Signed in, fetched successfully, and has none: the onboarding modal should show.
   needsOnboarding: boolean;
   select: (id: string) => void;
   create: (name: string, slug: string) => Promise<string | null>;
@@ -28,7 +29,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   // Remembering which user the list belongs to makes "loading" derivable, with no setState in the effect body.
-  const [loaded, setLoaded] = useState<{ userId: string; workspaces: Workspace[] } | null>(null);
+  const [loaded, setLoaded] = useState<{ userId: string; workspaces: Workspace[] | null } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -38,17 +39,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       .from("workspaces")
       .select("*")
       .order("created_at")
-      .then(({ data, error }) => {
-        // A failed fetch (offline, say) stays "loading" so it never looks like an empty account and triggers onboarding.
-        if (!cancelled && !error) setLoaded({ userId, workspaces: data });
-      });
+      .then(
+        ({ data, error }) => {
+          // null marks a failed fetch, so an offline account is never mistaken for an empty one.
+          if (!cancelled) setLoaded({ userId, workspaces: error ? null : data });
+        },
+        () => {
+          if (!cancelled) setLoaded({ userId, workspaces: null });
+        }
+      );
     return () => {
       cancelled = true;
     };
   }, [userId]);
 
   const ready = !!userId && loaded?.userId === userId;
-  const workspaces = useMemo(() => (loaded && loaded.userId === userId ? loaded.workspaces : []), [loaded, userId]);
+  const workspaces = useMemo(() => (loaded && loaded.userId === userId ? (loaded.workspaces ?? []) : []), [loaded, userId]);
   const current = workspaces.find((w) => w.id === selectedId) ?? workspaces[0] ?? null;
 
   const create = useCallback(
@@ -59,7 +65,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         if (error.code === "23505") return "That slug is already taken. Try another.";
         return error.message;
       }
-      setLoaded((prev) => ({ userId, workspaces: [...(prev?.userId === userId ? prev.workspaces : []), data] }));
+      setLoaded((prev) => ({ userId, workspaces: [...(prev?.userId === userId ? (prev.workspaces ?? []) : []), data] }));
       setSelectedId(data.id);
       return null;
     },
@@ -71,11 +77,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspaces,
       current,
       loading: !!userId && !ready,
-      needsOnboarding: ready && workspaces.length === 0,
+      needsOnboarding: ready && loaded?.workspaces != null && workspaces.length === 0,
       select: setSelectedId,
       create,
     }),
-    [workspaces, current, userId, ready, create]
+    [workspaces, current, userId, ready, loaded, create]
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
