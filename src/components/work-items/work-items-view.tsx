@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronRight, ListChecks, Plus, Trash2 } from "lucide-react";
+import { ChevronRight, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { initials, mockProjects, mockUser } from "@/lib/mock-data";
 import { useStorageTarget } from "@/lib/storage-target";
@@ -79,12 +79,14 @@ function WorkItemRow({
   projectId,
   me,
   onChange,
+  onEdit,
   onDelete,
 }: {
   item: StoredWorkItem;
   projectId: string;
   me: Me;
   onChange: (patch: Partial<StoredWorkItem>) => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const key = workItemKey(projectId, item.seq);
@@ -96,12 +98,17 @@ function WorkItemRow({
       <span className="w-16 shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-center font-mono text-xs text-neutral-600">
         {key}
       </span>
-      <div className="min-w-48 flex-1">
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={`Edit ${key}`}
+        className="min-w-48 flex-1 cursor-pointer text-left"
+      >
         <p className={`truncate text-sm ${item.status === "done" ? "text-neutral-400 line-through" : ""}`}>
           {item.title}
         </p>
         {item.description && <p className="truncate text-xs text-neutral-500">{item.description}</p>}
-      </div>
+      </button>
       <PillSelect
         label={`Status of ${key}`}
         value={item.status}
@@ -134,6 +141,15 @@ function WorkItemRow({
       </button>
       <button
         type="button"
+        onClick={onEdit}
+        aria-label={`Edit ${key} details`}
+        title="Edit"
+        className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+      >
+        <Pencil className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
         onClick={onDelete}
         aria-label={`Move ${key} to trash`}
         title="Move to trash"
@@ -148,12 +164,19 @@ function WorkItemRow({
 const fieldClass =
   "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
 
-function NewItemForm({
+// Shared by the "New work item" and "Edit Work Item" dialogs; `initial` pre-fills it for editing.
+function ItemForm({
   projectKey,
+  heading,
+  submitLabel,
+  initial,
   onSubmit,
   onCancel,
 }: {
   projectKey: string;
+  heading: string;
+  submitLabel: string;
+  initial?: StoredWorkItem;
   onSubmit: (input: NewWorkItemInput) => void;
   onCancel: () => void;
 }) {
@@ -174,26 +197,40 @@ function NewItemForm({
     <form onSubmit={submit} className="space-y-4 p-5">
       <div className="flex items-center gap-2">
         <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-600">{projectKey}</span>
-        <h2 className="text-base font-semibold">New work item</h2>
+        <h2 className="text-base font-semibold">{heading}</h2>
       </div>
       <div>
         <label htmlFor="wi-title" className="mb-1 block text-xs font-medium text-neutral-600">
           Title
         </label>
-        <input id="wi-title" name="title" required autoFocus maxLength={200} className={fieldClass} />
+        <input
+          id="wi-title"
+          name="title"
+          required
+          autoFocus
+          maxLength={200}
+          defaultValue={initial?.title}
+          className={fieldClass}
+        />
       </div>
       <div>
         <label htmlFor="wi-description" className="mb-1 block text-xs font-medium text-neutral-600">
           Description <span className="font-normal text-neutral-400">(optional)</span>
         </label>
-        <textarea id="wi-description" name="description" rows={3} className={`${fieldClass} resize-none`} />
+        <textarea
+          id="wi-description"
+          name="description"
+          rows={3}
+          defaultValue={initial?.description ?? ""}
+          className={`${fieldClass} resize-none`}
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="wi-status" className="mb-1 block text-xs font-medium text-neutral-600">
             Status
           </label>
-          <select id="wi-status" name="status" defaultValue="backlog" className={fieldClass}>
+          <select id="wi-status" name="status" defaultValue={initial?.status ?? "backlog"} className={fieldClass}>
             {statusOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -205,7 +242,7 @@ function NewItemForm({
           <label htmlFor="wi-priority" className="mb-1 block text-xs font-medium text-neutral-600">
             Priority
           </label>
-          <select id="wi-priority" name="priority" defaultValue="medium" className={fieldClass}>
+          <select id="wi-priority" name="priority" defaultValue={initial?.priority ?? "medium"} className={fieldClass}>
             {priorityOptions.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
@@ -226,7 +263,7 @@ function NewItemForm({
           type="submit"
           className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
         >
-          Create work item
+          {submitLabel}
         </button>
       </div>
     </form>
@@ -240,6 +277,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
   const { open, openDialog, closeDialog } = useNewWorkItem();
   const { user } = useAuth();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const editDialogRef = useRef<HTMLDialogElement>(null);
+  const [editingItem, setEditingItem] = useState<StoredWorkItem | null>(null);
   // In the cloud, assignees are real auth users; local preview keeps the mock user.
   const me: Me =
     workspaceId && user ? { id: user.id, name: (user.email ?? "Me").split("@")[0].replace(/[._-]+/g, " ") } : mockUser;
@@ -251,6 +290,13 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
   }, [open]);
+
+  useEffect(() => {
+    const dialog = editDialogRef.current;
+    if (!dialog) return;
+    if (editingItem && !dialog.open) dialog.showModal();
+    if (!editingItem && dialog.open) dialog.close();
+  }, [editingItem]);
 
   const live = items.filter((i) => !i.deleted_at).sort((a, b) => a.seq - b.seq);
   const visible = filter === "all" ? live : live.filter((i) => i.status === filter);
@@ -325,6 +371,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
                 projectId={projectId}
                 me={me}
                 onChange={(patch) => update(item.id, patch)}
+                onEdit={() => setEditingItem(item)}
                 onDelete={() => softDelete(item.id)}
               />
             ))}
@@ -340,13 +387,43 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
         className="m-auto w-full max-w-md rounded-xl border border-neutral-200 p-0 shadow-xl backdrop:bg-black/30"
       >
         {open && (
-          <NewItemForm
+          <ItemForm
             projectKey={projectIdentifier(projectId)}
+            heading="New work item"
+            submitLabel="Create work item"
             onCancel={closeDialog}
             onSubmit={(input) => {
               add(input);
               setFilter("all");
               closeDialog();
+            }}
+          />
+        )}
+      </dialog>
+
+      <dialog
+        ref={editDialogRef}
+        onClose={() => setEditingItem(null)}
+        onClick={(e) => e.target === e.currentTarget && setEditingItem(null)}
+        aria-label="Edit Work Item"
+        className="m-auto w-full max-w-md rounded-xl border border-neutral-200 p-0 shadow-xl backdrop:bg-black/30"
+      >
+        {editingItem && (
+          <ItemForm
+            key={editingItem.id}
+            projectKey={workItemKey(projectId, editingItem.seq)}
+            heading="Edit Work Item"
+            submitLabel="Save changes"
+            initial={editingItem}
+            onCancel={() => setEditingItem(null)}
+            onSubmit={(input) => {
+              update(editingItem.id, {
+                title: input.title.trim(),
+                description: input.description.trim() || null,
+                status: input.status,
+                priority: input.priority,
+              });
+              setEditingItem(null);
             }}
           />
         )}
