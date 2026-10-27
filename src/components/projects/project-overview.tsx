@@ -5,6 +5,7 @@ import { ArrowRight, Circle, Diamond, ExternalLink, GitFork, Square, type Lucide
 import HealthPill from "@/components/home/health-pill";
 import LiveWorkItems from "@/components/home/live-work-items";
 import { progressOf } from "@/components/home/project-card";
+import GithubActivity from "@/components/projects/github-activity";
 import { getFlow } from "@/lib/diagram-storage";
 import { techRows } from "@/lib/project-stack";
 import { getProjectDiagrams, type ProjectRecord } from "@/lib/projects";
@@ -216,6 +217,8 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
           </table>
         </div>
       </section>
+
+      <GithubActivity githubUrl={project.github_url} />
 
       <FlowchartPipeline key={project.id} projectId={project.id} />
 
