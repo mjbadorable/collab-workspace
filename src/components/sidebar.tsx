@@ -33,6 +33,7 @@ import Avatar from "@/components/settings/avatar";
 import { mockWorkspace } from "@/lib/mock-data";
 import { roleTone, useProfile } from "@/lib/profile-context";
 import { useProjects } from "@/lib/projects-context";
+import { useWorkspacePermissions } from "@/lib/use-permissions";
 
 const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Home", href: "/", icon: Home },
@@ -78,6 +79,8 @@ export default function Sidebar({
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const { user, loading, signOut } = useAuth();
   const { workspaces, current, select } = useWorkspaces();
+  // The server also rejects non-admin invites; hiding the menu item just avoids a dead end.
+  const { isAdmin: canInvite } = useWorkspacePermissions(user && current ? current.id : null);
   const workspaceName = current?.name ?? mockWorkspace.name;
 
   // Project sub-routes live under /projects/..., so "Projects" matches only its own page.
@@ -120,7 +123,7 @@ export default function Sidebar({
                       {w.id === current?.id && <Check className="h-4 w-4 text-red-600" />}
                     </button>
                   ))}
-                  {current && (
+                  {current && canInvite && (
                     <button
                       type="button"
                       role="menuitem"

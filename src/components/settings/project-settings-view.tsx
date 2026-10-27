@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { fetchMembers, type Member } from "@/lib/members";
 import { initials, mockUser } from "@/lib/mock-data";
 import type { ProjectRecord } from "@/lib/projects";
+import { useWorkspacePermissions } from "@/lib/use-permissions";
 import { useProjects } from "@/lib/projects-context";
 import type { StoredWorkItem } from "@/lib/work-items-storage";
 import { useIsClient } from "@/lib/use-is-client";
@@ -44,6 +45,9 @@ function General({ project }: { project: ProjectRecord }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const { user } = useAuth();
+  const { current } = useWorkspaces();
+  const { isAdmin, loading: permsLoading } = useWorkspacePermissions(user && current ? current.id : null);
 
   const save = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -118,7 +122,24 @@ function General({ project }: { project: ProjectRecord }) {
         <p className="mt-1 text-sm text-neutral-500">
           Removes the project from your workspace. Its work items stay stored and can be recovered by re-creating a project with the same identifier.
         </p>
-        {confirming ? (
+        {!isAdmin ? (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled
+              aria-describedby="ps-delete-gate"
+              className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 opacity-50"
+            >
+              Delete project
+            </button>
+            <span
+              id="ps-delete-gate"
+              className="rounded-full border border-neutral-200 bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600"
+            >
+              {permsLoading ? "Checking your role…" : "Admin role required to delete projects"}
+            </span>
+          </div>
+        ) : confirming ? (
           <div className="mt-3 flex gap-2">
             <button
               type="button"

@@ -10,6 +10,7 @@ import { getProjects } from "@/lib/projects";
 import { useProfile } from "@/lib/profile-context";
 import { useStorageTarget } from "@/lib/storage-target";
 import { useIsClient } from "@/lib/use-is-client";
+import { useWorkspaceMembers } from "@/lib/use-permissions";
 import { useWorkItems } from "@/lib/use-work-items";
 import {
   projectIdentifier,
@@ -89,6 +90,69 @@ function PillSelect<T extends string>({
 
 type Me = { id: string; name: string };
 
+// A workspace member who can be assigned work. Only the signed-in user has a photo (the profile avatar).
+type Person = { id: string; name: string; avatar_url: string | null };
+
+const nameFromEmail = (email: string) => email.split("@")[0].replace(/[._-]+/g, " ");
+
+// Unassigned, then me, then everyone else; a leftover assignee who is no longer a member keeps a label so the select stays valid.
+function assigneeOptions(people: Person[], me: Me, currentId: string | null): { value: string; label: string }[] {
+  const options = [
+    { value: "", label: "Unassigned" },
+    { value: me.id, label: `Assign to me (${me.name})` },
+    ...people.filter((p) => p.id !== me.id).map((p) => ({ value: p.id, label: p.name })),
+  ];
+  if (currentId && !options.some((o) => o.value === currentId)) options.push({ value: currentId, label: "Former member" });
+  return options;
+}
+
+// The assignee's avatar (photo or initials). The select laid over it is invisible but is what opens on click,
+// so quick-assigning and re-assigning work with mouse, touch and keyboard.
+function AssigneePicker({
+  label,
+  assigneeId,
+  people,
+  me,
+  onChange,
+}: {
+  label: string;
+  assigneeId: string | null;
+  people: Person[];
+  me: Me;
+  onChange: (id: string | null) => void;
+}) {
+  const person = assigneeId ? people.find((p) => p.id === assigneeId) : undefined;
+  const name = !assigneeId ? "Unassigned" : (person?.name ?? "Former member");
+  return (
+    <span className="relative inline-flex" title={`${name} (click to change)`}>
+      {!assigneeId ? (
+        <span className="rounded-full border border-dashed border-neutral-300 px-2 py-0.5 text-xs text-neutral-500">
+          Unassigned
+        </span>
+      ) : person?.avatar_url ? (
+        // eslint-disable-next-line @next/next/no-img-element -- user-uploaded data-URL avatar
+        <img src={person.avatar_url} alt="" className="h-6 w-6 rounded-full object-cover" />
+      ) : (
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700">
+          {initials(name) || "?"}
+        </span>
+      )}
+      <select
+        aria-label={label}
+        value={assigneeId ?? ""}
+        onChange={(e) => onChange(e.target.value || null)}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      >
+        {assigneeOptions(people, me, assigneeId).map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
 // A teammate just changed this card/row: a brief indigo ring and pulse.
 const REMOTE_FLASH = "animate-pulse bg-indigo-50 ring-2 ring-indigo-400";
 
@@ -159,6 +223,7 @@ function WorkItemRow({
   item,
   projectId,
   me,
+  people,
   remote,
   onChange,
   onEdit,
@@ -167,13 +232,13 @@ function WorkItemRow({
   item: StoredWorkItem;
   projectId: string;
   me: Me;
+  people: Person[];
   remote: boolean;
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const key = workItemKey(projectId, item.seq);
-  const mine = item.assignee_id === me.id;
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
 
   return (
@@ -209,23 +274,15 @@ function WorkItemRow({
         onChange={(p) => onChange({ priority: p })}
         prefix={<span className={`ml-2 h-1.5 w-1.5 rounded-full ${priority.dot}`} aria-hidden />}
       />
-      <button
-        type="button"
-        onClick={() => onChange({ assignee_id: mine ? null : me.id })}
-        title={mine ? `Assigned to ${me.name} (click to unassign)` : "Unassigned (click to assign to me)"}
-        aria-label={mine ? `Unassign ${key}` : `Assign ${key} to me`}
-        className="w-24 shrink-0 text-left"
-      >
-        {mine ? (
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700">
-            {initials(me.name)}
-          </span>
-        ) : (
-          <span className="rounded-full border border-dashed border-neutral-300 px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100">
-            Unassigned
-          </span>
-        )}
-      </button>
+      <div className="w-24 shrink-0">
+        <AssigneePicker
+          label={`Assignee of ${key}`}
+          assigneeId={item.assignee_id}
+          people={people}
+          me={me}
+          onChange={(assignee_id) => onChange({ assignee_id })}
+        />
+      </div>
       <button
         type="button"
         onClick={onEdit}
@@ -258,6 +315,7 @@ function BoardCard({
   item,
   projectId,
   me,
+  people,
   remote,
   onChange,
   onEdit,
@@ -266,13 +324,13 @@ function BoardCard({
   item: StoredWorkItem;
   projectId: string;
   me: Me;
+  people: Person[];
   remote: boolean;
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const key = workItemKey(projectId, item.seq);
-  const mine = item.assignee_id === me.id;
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
 
   return (
@@ -329,23 +387,15 @@ function BoardCard({
           options={statusOptions}
           onChange={(status) => onChange({ status })}
         />
-        <button
-          type="button"
-          onClick={() => onChange({ assignee_id: mine ? null : me.id })}
-          title={mine ? `Assigned to ${me.name} (click to unassign)` : "Unassigned (click to assign to me)"}
-          aria-label={mine ? `Unassign ${key}` : `Assign ${key} to me`}
-          className="ml-auto"
-        >
-          {mine ? (
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-semibold text-indigo-700">
-              {initials(me.name)}
-            </span>
-          ) : (
-            <span className="rounded-full border border-dashed border-neutral-300 px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-100">
-              Unassigned
-            </span>
-          )}
-        </button>
+        <div className="ml-auto">
+          <AssigneePicker
+            label={`Assignee of ${key}`}
+            assigneeId={item.assignee_id}
+            people={people}
+            me={me}
+            onChange={(assignee_id) => onChange({ assignee_id })}
+          />
+        </div>
       </div>
     </li>
   );
@@ -355,6 +405,7 @@ function KanbanBoard({
   items,
   projectId,
   me,
+  people,
   remoteUpdatedIds,
   onChange,
   onEdit,
@@ -365,6 +416,7 @@ function KanbanBoard({
   items: StoredWorkItem[];
   projectId: string;
   me: Me;
+  people: Person[];
   remoteUpdatedIds: ReadonlySet<string>;
   onChange: (id: string, patch: Partial<StoredWorkItem>) => void;
   onEdit: (item: StoredWorkItem) => void;
@@ -430,6 +482,7 @@ function KanbanBoard({
                   item={item}
                   projectId={projectId}
                   me={me}
+                  people={people}
                   remote={remoteUpdatedIds.has(item.id)}
                   onChange={(patch) => onChange(item.id, patch)}
                   onEdit={() => onEdit(item)}
@@ -461,6 +514,8 @@ function ItemForm({
   submitLabel,
   initial,
   defaultStatus,
+  people,
+  me,
   onSubmit,
   onCancel,
 }: {
@@ -469,6 +524,8 @@ function ItemForm({
   submitLabel: string;
   initial?: StoredWorkItem;
   defaultStatus?: WorkItemStatus;
+  people: Person[];
+  me: Me;
   onSubmit: (input: NewWorkItemInput) => void;
   onCancel: () => void;
 }) {
@@ -482,6 +539,7 @@ function ItemForm({
       description: String(f.get("description") ?? ""),
       status: f.get("status") as WorkItemStatus,
       priority: f.get("priority") as WorkItemPriority,
+      assignee_id: String(f.get("assignee") ?? "") || null,
     });
   };
 
@@ -542,6 +600,18 @@ function ItemForm({
             ))}
           </select>
         </div>
+      </div>
+      <div>
+        <label htmlFor="wi-assignee" className="mb-1 block text-xs font-medium text-neutral-600">
+          Assignee
+        </label>
+        <select id="wi-assignee" name="assignee" defaultValue={initial?.assignee_id ?? ""} className={fieldClass}>
+          {assigneeOptions(people, me, initial?.assignee_id ?? null).map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
       </div>
       <div className="flex justify-end gap-2 pt-1">
         <button
@@ -613,8 +683,16 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     }
   };
   // In the cloud, assignees are real auth users; local preview keeps the mock user.
-  const me: Me =
-    workspaceId && user ? { id: user.id, name: (user.email ?? "Me").split("@")[0].replace(/[._-]+/g, " ") } : mockUser;
+  const me: Me = workspaceId && user ? { id: user.id, name: displayName } : mockUser;
+  // Everyone who can be assigned: the workspace's members in the cloud, just the mock user in local preview.
+  const members = useWorkspaceMembers(workspaceId);
+  const people: Person[] = (members ?? [])
+    .map((m) => ({
+      id: m.user_id,
+      name: m.user_id === me.id ? me.name : nameFromEmail(m.email ?? "Member"),
+      avatar_url: m.user_id === me.id ? profile.avatar_url : null,
+    }))
+    .concat(workspaceId ? [] : [{ id: mockUser.id, name: mockUser.name, avatar_url: profile.avatar_url }]);
 
   // Native <dialog> gives focus trapping, Esc-to-close and an inert page behind it.
   useEffect(() => {
@@ -714,6 +792,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             items={live}
             projectId={projectId}
             me={me}
+            people={people}
             remoteUpdatedIds={remoteUpdatedIds}
             onChange={update}
             onEdit={setEditingItem}
@@ -739,6 +818,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
                 item={item}
                 projectId={projectId}
                 me={me}
+                people={people}
                 remote={remoteUpdatedIds.has(item.id)}
                 onChange={(patch) => update(item.id, patch)}
                 onEdit={() => setEditingItem(item)}
@@ -765,6 +845,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             heading="New work item"
             submitLabel="Create work item"
             defaultStatus={presetStatus}
+            people={people}
+            me={me}
             onCancel={closeDialog}
             onSubmit={(input) => {
               add(input);
@@ -789,6 +871,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             heading="Edit Work Item"
             submitLabel="Save changes"
             initial={editingItem}
+            people={people}
+            me={me}
             onCancel={() => setEditingItem(null)}
             onSubmit={(input) => {
               update(editingItem.id, {
@@ -796,6 +880,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
                 description: input.description.trim() || null,
                 status: input.status,
                 priority: input.priority,
+                assignee_id: input.assignee_id ?? null,
               });
               setEditingItem(null);
             }}

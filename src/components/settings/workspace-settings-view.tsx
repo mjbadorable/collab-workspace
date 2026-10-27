@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth-context";
 import { fetchMembers, type Member } from "@/lib/members";
 import { initials, mockUser, mockWorkspace } from "@/lib/mock-data";
 import { useIsClient } from "@/lib/use-is-client";
+import { useWorkspacePermissions } from "@/lib/use-permissions";
 import { useWorkspaces } from "@/lib/workspace-context";
 import InviteDialog from "./invite-dialog";
 import ProfileForm from "./profile-form";
@@ -43,7 +44,9 @@ function Profile() {
 }
 
 function General() {
+  const { user } = useAuth();
   const { current } = useWorkspaces();
+  const { isAdmin, loading } = useWorkspacePermissions(user && current ? current.id : null);
   return (
     <div className="space-y-5">
       <h2 className="text-base font-semibold">General</h2>
@@ -69,14 +72,22 @@ function General() {
       <div className="max-w-md rounded-lg border border-red-200 p-4">
         <h3 className="text-sm font-semibold text-red-700">Danger zone</h3>
         <p className="mt-1 text-sm text-neutral-500">Deleting a workspace removes all of its projects and data.</p>
-        <button
-          type="button"
-          disabled
-          title="Coming in a later milestone"
-          className="mt-3 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 opacity-50"
-        >
-          Delete workspace
-        </button>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* Deleting a workspace is not built yet, so the button stays disabled even for admins. */}
+          <button
+            type="button"
+            disabled
+            title={isAdmin ? "Coming in a later milestone" : undefined}
+            className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 opacity-50"
+          >
+            Delete workspace
+          </button>
+          {!isAdmin && (
+            <span className="rounded-full border border-neutral-200 bg-neutral-100 px-2.5 py-0.5 text-xs font-medium text-neutral-600">
+              {loading ? "Checking your role…" : "Admin role required to delete workspaces"}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

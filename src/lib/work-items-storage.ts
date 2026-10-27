@@ -15,6 +15,7 @@ export type NewWorkItemInput = {
   description: string;
   status: WorkItemStatus;
   priority: WorkItemPriority;
+  assignee_id?: string | null;
 };
 
 const storageKey = (projectId: string) => `collab-workspace:work-items:${projectId}`;
@@ -52,7 +53,7 @@ function seedItems(projectId: string): StoredWorkItem[] {
     return [
       seed(1, "Real-time Supabase Realtime channel listener for multi-user Kanban sync", "done", "high", mockUser.id),
       seed(2, "Automated GitHub commit and pull request activity widget in project overview", "done", "medium", mockUser.id),
-      seed(3, "Workspace-level member role permissions (Admin vs Member granular gates)", "backlog", "medium", null),
+      seed(3, "Workspace-level member role permissions (Admin vs Member granular gates)", "done", "medium", mockUser.id),
       seed(4, "Export project telemetry and architecture blueprint as printable PDF report", "backlog", "low", null),
       seed(5, "Plug & Play GitHub repo breakdown and auto-task generation", "done", "high", mockUser.id),
     ];
@@ -110,7 +111,7 @@ export function addWorkItem(items: StoredWorkItem[], projectId: string, input: N
     description: input.description.trim() || null,
     status: input.status,
     priority: input.priority,
-    assignee_id: null,
+    assignee_id: input.assignee_id ?? null,
     deleted_at: null,
     created_at: new Date().toISOString(),
   };
@@ -177,6 +178,7 @@ export async function insertCloudWorkItem(projectUuid: string, input: NewWorkIte
       description: input.description.trim() || null,
       status: input.status,
       priority: input.priority,
+      assignee_id: input.assignee_id ?? null,
     })
     .select()
     .single();
