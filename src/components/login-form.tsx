@@ -90,9 +90,8 @@ export default function LoginForm() {
   const busyLabel = mode === "signin" ? "Signing in…" : "Creating account…";
 
   return (
-    // Fixed so the landing page covers the app shell (sidebar) and fills the screen.
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
-      <div className="grid min-h-full lg:grid-cols-2">
+    <div className="bg-white">
+      <div className="grid min-h-screen lg:grid-cols-2">
         <aside className="hidden flex-col justify-between bg-neutral-950 p-12 text-white lg:flex">
           <div>
             <div className="flex items-center gap-2.5">

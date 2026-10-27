@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
@@ -12,12 +13,27 @@ import { NewWorkItemProvider } from "./work-items/new-work-item-context";
 const SidebarFallback = () => <div className="h-full w-64 border-r border-neutral-200 bg-neutral-50" />;
 
 export default function AppShell({ children }: { children: ReactNode }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [workspaceRequested, setWorkspaceRequested] = useState(false);
-
   return (
     <AuthProvider>
-    <WorkspaceProvider>
+      <WorkspaceProvider>
+        {/* usePathname() below is request-time data on dynamic routes, so it must sit under Suspense. */}
+        <Suspense fallback={<div className="h-screen" />}>
+          <Chrome>{children}</Chrome>
+        </Suspense>
+      </WorkspaceProvider>
+    </AuthProvider>
+  );
+}
+
+function Chrome({ children }: { children: ReactNode }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [workspaceRequested, setWorkspaceRequested] = useState(false);
+  const pathname = usePathname();
+
+  // The login page is a full-screen landing page: no sidebar, mobile header or workspace dialog.
+  if (pathname === "/login") return <>{children}</>;
+
+  return (
     <NewWorkItemProvider>
     <div className="flex h-screen overflow-hidden">
       {/* Desktop: fixed sidebar */}
@@ -69,7 +85,5 @@ export default function AppShell({ children }: { children: ReactNode }) {
     </div>
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
     </NewWorkItemProvider>
-    </WorkspaceProvider>
-    </AuthProvider>
   );
 }
