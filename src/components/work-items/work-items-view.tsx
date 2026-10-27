@@ -20,13 +20,13 @@ import { useNewWorkItem } from "./new-work-item-context";
 
 type Filter = "all" | WorkItemStatus;
 
-const statusOptions: { value: WorkItemStatus; label: string; tone: string }[] = [
+export const statusOptions: { value: WorkItemStatus; label: string; tone: string }[] = [
   { value: "backlog", label: "Backlog", tone: "border-neutral-200 bg-neutral-100 text-neutral-700" },
   { value: "in_progress", label: "In Progress", tone: "border-amber-200 bg-amber-50 text-amber-800" },
   { value: "done", label: "Done", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" },
 ];
 
-const priorityOptions: { value: WorkItemPriority; label: string; tone: string; dot: string }[] = [
+export const priorityOptions: { value: WorkItemPriority; label: string; tone: string; dot: string }[] = [
   { value: "low", label: "Low", tone: "border-neutral-200 text-neutral-600", dot: "bg-neutral-400" },
   { value: "medium", label: "Medium", tone: "border-blue-200 text-blue-700", dot: "bg-blue-500" },
   { value: "high", label: "High", tone: "border-red-200 text-red-700", dot: "bg-red-500" },
