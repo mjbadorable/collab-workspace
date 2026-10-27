@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ChevronRight, Kanban, List, ListChecks, Pencil, Plus, Trash2, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { initials, mockUser } from "@/lib/mock-data";
@@ -21,6 +22,9 @@ import { useNewWorkItem } from "./new-work-item-context";
 
 type Filter = "all" | WorkItemStatus;
 type ViewMode = "list" | "board";
+
+// ?status=backlog | in_progress | done deep-links to a status; anything else is ignored.
+const parseStatus = (value: string | null): WorkItemStatus | null => statusOptions.find((o) => o.value === value)?.value ?? null;
 
 const VIEW_KEY = "collab-workspace:work-items-view";
 
@@ -277,6 +281,7 @@ function KanbanBoard({
   onEdit,
   onDelete,
   onQuickAdd,
+  highlight,
 }: {
   items: StoredWorkItem[];
   projectId: string;
@@ -285,8 +290,15 @@ function KanbanBoard({
   onEdit: (item: StoredWorkItem) => void;
   onDelete: (id: string) => void;
   onQuickAdd: (status: WorkItemStatus) => void;
+  highlight: WorkItemStatus | null;
 }) {
   const [dragOver, setDragOver] = useState<WorkItemStatus | null>(null);
+  const highlightRef = useRef<HTMLElement>(null);
+
+  // A deep link (?status=done) brings that column into view.
+  useEffect(() => {
+    highlightRef.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [highlight]);
 
   const handleDragOver = (e: DragEvent<HTMLElement>, status: WorkItemStatus) => {
     e.preventDefault();
@@ -309,6 +321,7 @@ function KanbanBoard({
         return (
           <section
             key={col.value}
+            ref={col.value === highlight ? highlightRef : undefined}
             aria-label={col.label}
             onDragOver={(e) => handleDragOver(e, col.value)}
             onDragLeave={(e) => {
@@ -316,7 +329,11 @@ function KanbanBoard({
             }}
             onDrop={(e) => handleDrop(e, col.value)}
             className={`flex min-w-[280px] flex-1 flex-col rounded-lg border bg-neutral-50 transition-colors ${
-              dragOver === col.value ? "border-indigo-400 bg-indigo-50/60" : "border-neutral-200"
+              dragOver === col.value
+                ? "border-indigo-400 bg-indigo-50/60"
+                : col.value === highlight
+                  ? "border-red-400 ring-2 ring-red-200"
+                  : "border-neutral-200"
             }`}
           >
             <header className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium">
@@ -467,7 +484,14 @@ function ItemForm({
 function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId: string | null }) {
   const { items: allItems, error, add, update, softDelete } = useWorkItems(projectId, workspaceId);
   const items = allItems ?? [];
-  const [filter, setFilter] = useState<Filter>("all");
+  const statusParam = parseStatus(useSearchParams().get("status"));
+  const [filter, setFilter] = useState<Filter>(statusParam ?? "all");
+  // Following a deep link while this view is already mounted: adopt the new status during render.
+  const [seenParam, setSeenParam] = useState(statusParam);
+  if (statusParam !== seenParam) {
+    setSeenParam(statusParam);
+    if (statusParam) setFilter(statusParam);
+  }
   const { open, openDialog, closeDialog } = useNewWorkItem();
   const { user } = useAuth();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -587,6 +611,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
           <p className="px-6 py-16 text-center text-sm text-neutral-500">Loading work items…</p>
         ) : viewMode === "board" ? (
           <KanbanBoard
+            highlight={statusParam}
             items={live}
             projectId={projectId}
             me={me}

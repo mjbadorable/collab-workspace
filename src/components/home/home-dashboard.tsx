@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock, Inbox, ListTodo, Network, Palette, Plus } from "lucide-react";
 import Greeting from "@/components/greeting";
@@ -7,48 +8,55 @@ import { priorityOptions, statusOptions } from "@/components/work-items/work-ite
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import { useAuth } from "@/lib/auth-context";
 import { mockUser, mockWorkspace } from "@/lib/mock-data";
-import { SEED_PROJECT } from "@/lib/projects";
+import { SEED_PROJECT, type ProjectRecord } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { workItemKey, type StoredWorkItem } from "@/lib/work-items-storage";
 import LiveWorkItems from "./live-work-items";
 import ProjectCard from "./project-card";
 
-const project = SEED_PROJECT;
-
-const launchpad = [
+const launchpad = (projectId: string) => [
   {
-    href: `/projects/${project.id}/diagrams`,
+    href: `/projects/${projectId}/diagrams`,
     title: "React Flow Architecture",
     body: "Map flows and ERDs on the interactive canvas.",
     icon: Network,
   },
-  { href: "/design", title: "UI Design Canvas", body: "Auto-layout mockups linked to your tasks.", icon: Palette },
+  { href: `/projects/${projectId}/designs`, title: "UI Design Canvas", body: "Auto-layout mockups linked to your tasks.", icon: Palette },
 ];
 
-function Stats({ items }: { items: StoredWorkItem[] | null }) {
+// Each card deep-links to the project's work items filtered by that status.
+function Stats({ items, projectId }: { items: StoredWorkItem[] | null; projectId: string }) {
   const value = (fn: (i: StoredWorkItem) => boolean) => (items ? items.filter(fn).length : "–");
   const stats = [
-    { label: "Open tasks", value: value((i) => i.status !== "done"), icon: ListTodo },
-    { label: "In progress", value: value((i) => i.status === "in_progress"), icon: Clock },
-    { label: "Completed", value: value((i) => i.status === "done"), icon: CheckCircle2 },
+    { label: "Open tasks", status: "backlog", value: value((i) => i.status !== "done"), icon: ListTodo },
+    { label: "In progress", status: "in_progress", value: value((i) => i.status === "in_progress"), icon: Clock },
+    { label: "Completed", status: "done", value: value((i) => i.status === "done"), icon: CheckCircle2 },
   ];
   return (
     <div className="mt-6 grid gap-4 sm:grid-cols-3">
-      {stats.map(({ label, value, icon: Icon }) => (
-        <div key={label} className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+      {stats.map(({ label, status, value, icon: Icon }) => (
+        <Link
+          key={label}
+          href={`/projects/${projectId}/work-items?status=${status}`}
+          className="group block cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-red-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+        >
           <div className="flex items-center gap-2 text-sm text-neutral-500">
             <Icon className="h-4 w-4" aria-hidden />
             {label}
+            <ArrowRight
+              className="ml-auto h-4 w-4 -translate-x-1 text-red-500 opacity-0 transition group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100"
+              aria-hidden
+            />
           </div>
           <p className="mt-2 text-3xl font-semibold">{value}</p>
-        </div>
+        </Link>
       ))}
     </div>
   );
 }
 
-function WorkList({ items }: { items: StoredWorkItem[] | null }) {
+function WorkList({ items, project }: { items: StoredWorkItem[] | null; project: ProjectRecord }) {
   const { openDialog } = useNewWorkItem();
   const active = (items ?? []).filter((i) => i.status !== "done").sort((a, b) => a.seq - b.seq);
 
@@ -107,7 +115,9 @@ export default function HomeDashboard() {
   const { user } = useAuth();
   const { current } = useWorkspaces();
   const { projects } = useProjects();
-  const primary = projects.find((p) => p.id === project.id) ?? project;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The picked project, else the main one; falls back if the picked project was deleted.
+  const selected = projects.find((p) => p.id === selectedId) ?? projects.find((p) => p.id === SEED_PROJECT.id) ?? projects[0] ?? SEED_PROJECT;
   // Cloud users are named after their email; local preview keeps the mock user.
   const name = user
     ? (user.email ?? "there").split("@")[0].replace(/[._-]+/g, " ")
@@ -117,9 +127,27 @@ export default function HomeDashboard() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
       <Greeting name={name} />
-      <p className="mt-1 text-sm text-neutral-500">Here&apos;s what&apos;s on your plate in {workspaceName}.</p>
+      <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-neutral-500">Here&apos;s what&apos;s on your plate in {workspaceName}.</p>
+        {projects.length > 1 && (
+          <label className="flex items-center gap-2 text-sm text-neutral-600">
+            Project
+            <select
+              value={selected.id}
+              onChange={(e) => setSelectedId(e.target.value)}
+              className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+            >
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      </div>
 
-      <LiveWorkItems fallback={<div className="mt-6 h-96" />}>
+      <LiveWorkItems projectId={selected.id} fallback={<div className="mt-6 h-96" />}>
         {(items, error) => (
           <>
             {error && (
@@ -127,16 +155,16 @@ export default function HomeDashboard() {
                 {error}
               </p>
             )}
-            <Stats items={items} />
+            <Stats items={items} projectId={selected.id} />
 
             <h2 className="mt-8 text-sm font-semibold text-neutral-700">Active project</h2>
             <div className="mt-3">
-              <ProjectCard project={primary} items={items} />
+              <ProjectCard project={selected} items={items} />
             </div>
 
             <h2 className="mt-8 text-sm font-semibold text-neutral-700">Your work items</h2>
             <div className="mt-3">
-              <WorkList items={items} />
+              <WorkList items={items} project={selected} />
             </div>
           </>
         )}
@@ -144,11 +172,11 @@ export default function HomeDashboard() {
 
       <h2 className="mt-8 text-sm font-semibold text-neutral-700">Quick launchpad</h2>
       <div className="mt-3 grid gap-4 sm:grid-cols-2">
-        {launchpad.map(({ href, title, body, icon: Icon }) => (
+        {launchpad(selected.id).map(({ href, title, body, icon: Icon }) => (
           <Link
             key={href}
             href={href}
-            className="group flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-red-300"
+            className="group flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-600">
               <Icon className="h-5 w-5" aria-hidden />
