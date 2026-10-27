@@ -1,7 +1,8 @@
 "use client";
 
-import { Frame, Link2, RectangleHorizontal, Square, Type, type LucideIcon } from "lucide-react";
-import type { CanvasNode, NodeType } from "@/lib/design-storage";
+import { useState } from "react";
+import { Frame, Link2, Pencil, Plus, RectangleHorizontal, Square, Trash2, Type, type LucideIcon } from "lucide-react";
+import type { CanvasNode, DesignPage, NodeType } from "@/lib/design-storage";
 
 const icons: Record<NodeType, LucideIcon> = {
   frame: Frame,
@@ -49,14 +50,104 @@ function Layer({
   );
 }
 
+function PageRow({
+  page,
+  active,
+  canDelete,
+  onSelect,
+  onRename,
+  onDelete,
+}: {
+  page: DesignPage;
+  active: boolean;
+  canDelete: boolean;
+  onSelect: () => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+}) {
+  const [renaming, setRenaming] = useState(false);
+
+  if (renaming) {
+    const finish = (value: string) => {
+      setRenaming(false);
+      onRename(value);
+    };
+    return (
+      <li>
+        <input
+          aria-label="Page name"
+          autoFocus
+          defaultValue={page.name}
+          maxLength={40}
+          onFocus={(e) => e.currentTarget.select()}
+          onBlur={(e) => finish(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") finish(e.currentTarget.value);
+            // Cancelling re-applies the old name; blur then fires with the same value.
+            else if (e.key === "Escape") finish(page.name);
+          }}
+          className="w-full rounded border border-indigo-400 bg-white px-2 py-1 text-sm outline-none"
+        />
+      </li>
+    );
+  }
+
+  return (
+    <li
+      className={`group flex items-center gap-1 rounded pr-1 ${active ? "bg-neutral-100 font-medium" : "hover:bg-neutral-50"}`}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        onDoubleClick={() => setRenaming(true)}
+        aria-current={active ? "page" : undefined}
+        title="Double-click to rename"
+        className="min-w-0 flex-1 truncate px-2 py-1 text-left text-sm"
+      >
+        {page.name}
+      </button>
+      <button
+        type="button"
+        onClick={() => setRenaming(true)}
+        aria-label={`Rename ${page.name}`}
+        className="rounded p-1 text-neutral-400 opacity-0 hover:bg-neutral-200 hover:text-neutral-700 focus:opacity-100 group-hover:opacity-100"
+      >
+        <Pencil className="h-3 w-3" aria-hidden />
+      </button>
+      {canDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={`Delete ${page.name}`}
+          className="rounded p-1 text-neutral-400 opacity-0 hover:bg-red-50 hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
+        >
+          <Trash2 className="h-3 w-3" aria-hidden />
+        </button>
+      )}
+    </li>
+  );
+}
+
 export default function LayersTree({
+  pages,
+  activePageId,
   nodes,
   selectedId,
   onSelect,
+  onSelectPage,
+  onAddPage,
+  onRenamePage,
+  onDeletePage,
 }: {
+  pages: DesignPage[];
+  activePageId: string;
   nodes: CanvasNode[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onSelectPage: (id: string) => void;
+  onAddPage: () => void;
+  onRenamePage: (id: string, name: string) => void;
+  onDeletePage: (id: string) => void;
 }) {
   return (
     <div className="flex h-full w-60 shrink-0 flex-col overflow-y-auto border-r border-neutral-200 bg-white">
@@ -65,23 +156,39 @@ export default function LayersTree({
           <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-400">Pages</h2>
           <button
             type="button"
-            disabled
-            title="Multiple pages are not supported yet"
+            onClick={onAddPage}
             aria-label="Add page"
-            className="rounded px-1 text-neutral-300"
+            title="Add page"
+            className="rounded p-0.5 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
           >
-            +
+            <Plus className="h-4 w-4" aria-hidden />
           </button>
         </div>
-        <p className="mt-1 rounded bg-neutral-100 px-2 py-1 text-sm font-medium">Page 1</p>
+        <ul className="mt-1 space-y-0.5">
+          {pages.map((page) => (
+            <PageRow
+              key={page.id}
+              page={page}
+              active={page.id === activePageId}
+              canDelete={pages.length > 1}
+              onSelect={() => onSelectPage(page.id)}
+              onRename={(name) => onRenamePage(page.id, name)}
+              onDelete={() => onDeletePage(page.id)}
+            />
+          ))}
+        </ul>
       </section>
       <section className="p-3">
         <h2 className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400">Layers</h2>
-        <ul>
-          {nodes.map((node) => (
-            <Layer key={node.id} node={node} depth={0} selectedId={selectedId} onSelect={onSelect} />
-          ))}
-        </ul>
+        {nodes.length === 0 ? (
+          <p className="text-sm text-neutral-500">Empty page. Pick a Frame or a device preset to start.</p>
+        ) : (
+          <ul>
+            {nodes.map((node) => (
+              <Layer key={node.id} node={node} depth={0} selectedId={selectedId} onSelect={onSelect} />
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

@@ -2,13 +2,35 @@
 
 import { useEffect, useRef, useState, type MouseEvent, type PointerEvent } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, Frame, Hand, MousePointer2, Minus, Plus, Square, TriangleAlert, Type, type LucideIcon } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  Frame,
+  Hand,
+  Minus,
+  Monitor,
+  MousePointer2,
+  Plus,
+  Smartphone,
+  Square,
+  Tablet,
+  Trash2,
+  TriangleAlert,
+  Type,
+  type LucideIcon,
+} from "lucide-react";
 import {
   addChildNode,
+  addPage,
+  deleteNode,
+  deletePage,
+  devicePresets,
+  duplicateNode,
   findNode,
   findParentId,
   loadDesignFile,
   makeNode,
+  renamePage,
   saveDesignFile,
   updateNode,
   type CanvasNode,
@@ -38,20 +60,71 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
   const [file, setFile] = useState(initial);
   const [saved, setSaved] = useState(true);
   const [items] = useState(() => loadWorkItems(projectId));
-  const [selectedId, setSelectedId] = useState<string | null>(initial.nodes[0]?.id ?? null);
+  const [activePageId, setActivePageId] = useState(initial.pages[0].id);
+  const [selectedId, setSelectedId] = useState<string | null>(initial.pages[0].nodes[0]?.id ?? null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("select");
   const [view, setView] = useState<View>({ x: 80, y: 70, z: 0.5 });
   const viewportRef = useRef<HTMLDivElement>(null);
   const panRef = useRef<{ px: number; py: number; vx: number; vy: number } | null>(null);
 
-  const selected = selectedId ? findNode(file.nodes, selectedId) : null;
+  const page = file.pages.find((p) => p.id === activePageId) ?? file.pages[0];
+  const nodes = page.nodes;
+  const selected = selectedId ? findNode(nodes, selectedId) : null;
+  const latest = useRef({ remove: () => {}, duplicate: () => {} });
 
   // Every change is saved straight away, so the "Saved" indicator only turns off if storage fails.
-  const edit = (fn: (nodes: CanvasNode[]) => CanvasNode[]) => {
-    const next = { ...file, nodes: fn(file.nodes), updated_at: new Date().toISOString(), updated_by: mockUser.name };
-    setFile(next);
-    setSaved(saveDesignFile(next));
+  const commit = (next: DesignFile) => {
+    const stamped = { ...next, updated_at: new Date().toISOString(), updated_by: mockUser.name };
+    setFile(stamped);
+    setSaved(saveDesignFile(stamped));
+  };
+  const edit = (fn: (nodes: CanvasNode[]) => CanvasNode[]) =>
+    commit({ ...file, pages: file.pages.map((p) => (p.id === page.id ? { ...p, nodes: fn(p.nodes) } : p)) });
+
+  const switchPage = (id: string) => {
+    setActivePageId(id);
+    setSelectedId(null);
+    setEditingId(null);
+  };
+  const onAddPage = () => {
+    const next = addPage(file);
+    commit(next);
+    switchPage(next.pages[next.pages.length - 1].id);
+  };
+  const onDeletePage = (id: string) => {
+    const doomed = file.pages.find((p) => p.id === id);
+    if (!doomed || (doomed.nodes.length > 0 && !window.confirm(`Delete "${doomed.name}" and its layers?`))) return;
+    const next = deletePage(file, id);
+    commit(next);
+    if (id === page.id) switchPage(next.pages[0].id);
+  };
+
+  const removeSelected = () => {
+    if (!selectedId) return;
+    edit((list) => deleteNode(list, selectedId));
+    setSelectedId(null);
+    setEditingId(null);
+  };
+  const duplicateSelected = () => {
+    if (!selectedId) return;
+    const result = duplicateNode(nodes, selectedId);
+    if (!result.newId) return;
+    edit(() => result.nodes);
+    setSelectedId(result.newId);
+  };
+
+  // Resizes the selected top-level frame to the device, or adds a new frame beside the existing ones.
+  const applyPreset = (preset: (typeof devicePresets)[number]) => {
+    const size = { widthMode: "fixed", heightMode: "fixed", width: preset.width, height: preset.height } as const;
+    if (selected && selected.type === "frame" && nodes.some((n) => n.id === selected.id)) {
+      patchNode(selected.id, size);
+      return;
+    }
+    const right = nodes.reduce((max, n) => Math.max(max, n.x + (n.widthMode === "fixed" ? n.width : 400)), -80);
+    const frame = makeNode("frame", { name: `${preset.label} · ${preset.width}×${preset.height}`, x: right + 80, y: 0, ...size });
+    edit((list) => [...list, frame]);
+    setSelectedId(frame.id);
   };
   const patchNode = (id: string, patch: Partial<CanvasNode>) => edit((nodes) => updateNode(nodes, id, patch));
 
@@ -78,11 +151,26 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
+  // The key listener is registered once, so it reaches the current handlers through a ref.
+  useEffect(() => {
+    latest.current = { remove: removeSelected, duplicate: duplicateSelected };
+  });
+
   useEffect(() => {
     const shortcuts: Record<string, Tool> = { f: "frame", r: "rectangle", t: "text", h: "hand", v: "select" };
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if ((e.target as HTMLElement).closest("input, textarea, select, [contenteditable]")) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
+        e.preventDefault(); // otherwise the browser bookmarks the page
+        latest.current.duplicate();
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        latest.current.remove();
+        return;
+      }
       const next = shortcuts[e.key.toLowerCase()];
       if (next) setTool(next);
       else if (e.key === "Escape") setSelectedId(null);
@@ -108,7 +196,7 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
       const x = Math.round((e.clientX - rect.left - view.x) / view.z);
       const y = Math.round((e.clientY - rect.top - view.y) / view.z);
       const frame = makeNode("frame", {
-        name: `Frame ${file.nodes.length + 1}`,
+        name: `Frame ${nodes.length + 1}`,
         x,
         y,
         widthMode: "fixed",
@@ -121,9 +209,9 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
     } else {
       // Rectangles and text go into the frame that was clicked, else the selection's frame, else the first frame.
       const base = hitId ?? selectedId;
-      const baseNode = base ? findNode(file.nodes, base) : null;
+      const baseNode = base ? findNode(nodes, base) : null;
       const parentId =
-        (baseNode?.type === "frame" ? baseNode.id : base ? findParentId(file.nodes, base) : null) ?? file.nodes[0]?.id;
+        (baseNode?.type === "frame" ? baseNode.id : base ? findParentId(nodes, base) : null) ?? nodes[0]?.id;
       if (parentId) {
         const child = makeNode(tool === "text" ? "text" : "rectangle");
         edit((nodes) => addChildNode(nodes, parentId, child));
@@ -155,7 +243,7 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
 
   const onDoubleClick = (e: MouseEvent<HTMLDivElement>) => {
     const id = (e.target as HTMLElement).closest<HTMLElement>("[data-node-id]")?.dataset.nodeId;
-    const node = id ? findNode(file.nodes, id) : null;
+    const node = id ? findNode(nodes, id) : null;
     if (node && (node.type === "text" || node.type === "button")) {
       setSelectedId(node.id);
       setEditingId(node.id);
@@ -191,6 +279,33 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
           ))}
         </div>
 
+        <div role="group" aria-label="Device presets" className="flex items-center gap-0.5">
+          {devicePresets.map((preset) => {
+            const Icon = preset.value === "desktop" ? Monitor : preset.value === "tablet" ? Tablet : Smartphone;
+            return (
+              <button
+                key={preset.value}
+                type="button"
+                onClick={() => applyPreset(preset)}
+                title={`${preset.label} ${preset.width}×${preset.height}: resizes the selected frame, or adds a new one`}
+                className="flex items-center gap-1 rounded px-1.5 py-1 text-xs text-neutral-600 hover:bg-neutral-100"
+              >
+                <Icon className="h-4 w-4" aria-hidden /> <span className="hidden xl:inline">{preset.label}</span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={removeSelected}
+            disabled={!selected}
+            aria-label="Delete selected layer"
+            title="Delete selected layer (Delete)"
+            className="ml-1 rounded p-1.5 text-red-600 hover:bg-red-50 disabled:text-neutral-300 disabled:hover:bg-transparent"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-0.5">
             <button type="button" aria-label="Zoom out" onClick={() => zoomBy(1 / 1.25)} className="rounded p-1 text-neutral-600 hover:bg-neutral-100">
@@ -219,7 +334,17 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <LayersTree nodes={file.nodes} selectedId={selectedId} onSelect={setSelectedId} />
+        <LayersTree
+          pages={file.pages}
+          activePageId={page.id}
+          nodes={nodes}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onSelectPage={switchPage}
+          onAddPage={onAddPage}
+          onRenamePage={(id, name) => commit(renamePage(file, id, name))}
+          onDeletePage={onDeletePage}
+        />
 
         <div
           ref={viewportRef}
@@ -240,7 +365,7 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
             className="absolute left-0 top-0 origin-top-left"
             style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}
           >
-            {file.nodes.map((node) => (
+            {nodes.map((node) => (
               <CanvasNodeView
                 key={node.id}
                 node={node}
@@ -259,6 +384,7 @@ function Editor({ projectId, initial }: { projectId: string; initial: DesignFile
           node={selected}
           items={items}
           onPatch={(patch) => selectedId && patchNode(selectedId, patch)}
+          onDelete={removeSelected}
         />
       </div>
     </div>

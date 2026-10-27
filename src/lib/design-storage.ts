@@ -39,8 +39,65 @@ export type DesignFile = {
   updated_at: string;
   created_at: string;
   deleted_at: string | null;
-  nodes: CanvasNode[];
+  pages: DesignPage[];
 };
+
+export type DesignPage = { id: string; name: string; nodes: CanvasNode[] };
+
+// Files saved before pages existed carry `nodes` instead of `pages`.
+type StoredDesignFile = Omit<DesignFile, "pages"> & { pages?: DesignPage[]; nodes?: CanvasNode[] };
+
+function normalizeFile({ nodes, pages, ...rest }: StoredDesignFile): DesignFile {
+  const migrated = pages && pages.length > 0 ? pages : [{ id: `${rest.id}-page-1`, name: "Page 1", nodes: nodes ?? [] }];
+  return { ...rest, pages: migrated };
+}
+
+export const devicePresets = [
+  { value: "desktop", label: "Desktop", width: 1440, height: 900 },
+  { value: "tablet", label: "Tablet", width: 810, height: 1080 },
+  { value: "mobile", label: "Mobile", width: 390, height: 844 },
+] as const;
+
+// Removes the node and everything inside it.
+export function deleteNode(nodes: CanvasNode[], id: string): CanvasNode[] {
+  return nodes.filter((n) => n.id !== id).map((n) => (n.children.length ? { ...n, children: deleteNode(n.children, id) } : n));
+}
+
+const cloneNode = (node: CanvasNode): CanvasNode => ({ ...node, id: crypto.randomUUID(), children: node.children.map(cloneNode) });
+
+// Inserts a copy right after the original (top-level copies are nudged so they don't sit exactly on top).
+export function duplicateNode(nodes: CanvasNode[], id: string): { nodes: CanvasNode[]; newId: string | null } {
+  let newId: string | null = null;
+  const walk = (list: CanvasNode[], root: boolean): CanvasNode[] =>
+    list.flatMap((n) => {
+      if (n.id === id) {
+        const copy = cloneNode(n);
+        newId = copy.id;
+        return [n, root ? { ...copy, name: `${n.name} copy`, x: n.x + 40, y: n.y + 40 } : { ...copy, name: `${n.name} copy` }];
+      }
+      return [n.children.length ? { ...n, children: walk(n.children, false) } : n];
+    });
+  return { nodes: walk(nodes, true), newId };
+}
+
+const touch = (file: DesignFile, pages: DesignPage[]): DesignFile => ({ ...file, pages, updated_at: new Date().toISOString() });
+
+export function addPage(file: DesignFile, name?: string): DesignFile {
+  const page: DesignPage = { id: crypto.randomUUID(), name: name?.trim() || `Page ${file.pages.length + 1}`, nodes: [] };
+  return touch(file, [...file.pages, page]);
+}
+
+export function renamePage(file: DesignFile, pageId: string, name: string): DesignFile {
+  const trimmed = name.trim();
+  if (!trimmed) return file;
+  return touch(file, file.pages.map((p) => (p.id === pageId ? { ...p, name: trimmed } : p)));
+}
+
+// A file always keeps at least one page.
+export function deletePage(file: DesignFile, pageId: string): DesignFile {
+  if (file.pages.length <= 1) return file;
+  return touch(file, file.pages.filter((p) => p.id !== pageId));
+}
 
 const storageKey = "collab-workspace:design-files";
 
@@ -220,7 +277,7 @@ function seedExamReviewerDesign(): DesignFile {
     updated_at: "2026-10-26T09:00:00.000Z",
     created_at: "2026-10-26T09:00:00.000Z",
     deleted_at: null,
-    nodes: [screen],
+    pages: [{ id: "seed-design-quiz-ui-page-1", name: "Page 1", nodes: [screen] }],
   };
 }
 
@@ -327,7 +384,7 @@ function seedGradeAssistantDesign(): DesignFile {
     updated_at: "2026-10-27T09:00:00.000Z",
     created_at: "2026-10-27T09:00:00.000Z",
     deleted_at: null,
-    nodes: [screen],
+    pages: [{ id: "seed-design-grade-ui-page-1", name: "Page 1", nodes: [screen] }],
   };
 }
 
@@ -341,7 +398,7 @@ export function loadDesignFiles(): DesignFile[] {
     const raw = localStorage.getItem(storageKey);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) stored = parsed;
+      if (Array.isArray(parsed)) stored = (parsed as StoredDesignFile[]).map(normalizeFile);
     }
   } catch {
     // corrupt JSON or storage unavailable: fall back to the seed data
@@ -375,16 +432,22 @@ export function createDesignFile(projectId: string, name: string): DesignFile {
     updated_at: now,
     created_at: now,
     deleted_at: null,
-    nodes: [
-      makeNode("frame", {
-        name: "Frame 1",
-        widthMode: "fixed",
-        heightMode: "fixed",
-        width: 1440,
-        height: 900,
-        padding: 32,
-        gap: 16,
-      }),
+    pages: [
+      {
+        id: crypto.randomUUID(),
+        name: "Page 1",
+        nodes: [
+          makeNode("frame", {
+            name: "Frame 1",
+            widthMode: "fixed",
+            heightMode: "fixed",
+            width: 1440,
+            height: 900,
+            padding: 32,
+            gap: 16,
+          }),
+        ],
+      },
     ],
   };
   saveDesignFile(file);
@@ -412,7 +475,10 @@ export function getProjectDesignFile(projectId: string): DesignFile {
   });
   const withContent: DesignFile = {
     ...file,
-    nodes: file.nodes.map((frame) => ({ ...frame, name: "Home Screen", children: [title, identifier] })),
+    pages: file.pages.map((page) => ({
+      ...page,
+      nodes: page.nodes.map((frame) => ({ ...frame, name: "Home Screen", children: [title, identifier] })),
+    })),
   };
   saveDesignFile(withContent);
   return withContent;

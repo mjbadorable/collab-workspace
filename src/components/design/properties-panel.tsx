@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Link2Off } from "lucide-react";
+import { Link2Off, Trash2 } from "lucide-react";
 import type { Align, CanvasNode, Direction, Distribute, SizeMode } from "@/lib/design-storage";
 import { workItemKey, type StoredWorkItem } from "@/lib/work-items-storage";
 
@@ -68,7 +68,7 @@ const sizeModes: { value: SizeMode; label: string }[] = [
   { value: "hug", label: "Hug" },
 ];
 
-function Properties({ node, onPatch }: { node: CanvasNode; onPatch: Patch }) {
+function Properties({ node, onPatch, onDelete }: { node: CanvasNode; onPatch: Patch; onDelete: () => void }) {
   const isFrame = node.type === "frame";
   const hasText = node.type === "text" || node.type === "button";
   const hex = /^#[0-9a-f]{6}$/i.test(node.fill) ? node.fill : "#000000";
@@ -183,6 +183,14 @@ function Properties({ node, onPatch }: { node: CanvasNode; onPatch: Patch }) {
           />
         </div>
       </section>
+
+      <button
+        type="button"
+        onClick={onDelete}
+        className="flex w-full items-center justify-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"
+      >
+        <Trash2 className="h-4 w-4" aria-hidden /> Delete layer
+      </button>
     </div>
   );
 }
@@ -249,7 +257,17 @@ function LinkedTasks({ node, items, onPatch }: { node: CanvasNode; items: Stored
   );
 }
 
-export default function PropertiesPanel({ node, items, onPatch }: { node: CanvasNode | null; items: StoredWorkItem[]; onPatch: Patch }) {
+export default function PropertiesPanel({
+  node,
+  items,
+  onPatch,
+  onDelete,
+}: {
+  node: CanvasNode | null;
+  items: StoredWorkItem[];
+  onPatch: Patch;
+  onDelete: () => void;
+}) {
   const [tab, setTab] = useState<"properties" | "tasks">("properties");
   const tabs = [
     { value: "properties", label: "Properties" },
@@ -276,7 +294,7 @@ export default function PropertiesPanel({ node, items, onPatch }: { node: Canvas
       </div>
       {node ? (
         tab === "properties" ? (
-          <Properties node={node} onPatch={onPatch} />
+          <Properties node={node} onPatch={onPatch} onDelete={onDelete} />
         ) : (
           <LinkedTasks node={node} items={items} onPatch={onPatch} />
         )
