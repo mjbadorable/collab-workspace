@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   ChevronDown,
@@ -37,6 +37,7 @@ const itemClass = (active: boolean) =>
 
 export default function Sidebar({ onNavigate, onNewWorkspace }: { onNavigate?: () => void; onNewWorkspace: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { openDialog } = useNewWorkItem();
   const [open, setOpen] = useState<Record<string, boolean>>({ [mockProjects[0].id]: true });
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -200,7 +201,10 @@ export default function Sidebar({ onNavigate, onNewWorkspace }: { onNavigate?: (
             {user ? (
               <button
                 type="button"
-                onClick={() => void signOut()}
+                onClick={async () => {
+                  await signOut();
+                  router.push("/login");
+                }}
                 title="Sign out"
                 aria-label="Sign out"
                 className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"

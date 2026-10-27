@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -166,10 +166,31 @@ export default function LoginForm() {
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Covers both a fresh sign-in and visiting /login while already signed in.
+  // Doors: they start apart on mount and slide shut, then slide apart again after a successful sign-in.
+  const [closed, setClosed] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const doorsApart = !closed || opening;
+  // Set while a submit is in flight so the redirect below doesn't cut the door animation short.
+  const submitting = useRef(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   useEffect(() => {
-    if (user) router.replace("/");
+    const frame = requestAnimationFrame(() => setClosed(true));
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timer.current);
+    };
+  }, []);
+
+  // Covers visiting /login while already signed in; a fresh sign-in is redirected by openDoors.
+  useEffect(() => {
+    if (user && !submitting.current) router.replace("/");
   }, [user, router]);
+
+  const openDoors = () => {
+    setOpening(true);
+    timer.current = setTimeout(() => router.replace("/"), 700);
+  };
 
   const switchMode = (next: Mode) => {
     setMode(next);
@@ -190,29 +211,53 @@ export default function LoginForm() {
     setBusy(true);
     setError(null);
     setNotice(null);
+    submitting.current = true;
+    let entered = false;
     try {
       if (mode === "signin") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) setError(error.message);
+        else entered = true;
       } else {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) setError(error.message);
         // With email confirmation on, signUp succeeds but returns no session until the link is clicked.
         else if (!data.session) setNotice("Check your email for a confirmation link, then sign in.");
+        else entered = true;
       }
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
     } finally {
       setBusy(false);
+      if (entered) openDoors();
+      else submitting.current = false;
     }
   };
 
   const busyLabel = mode === "signin" ? "Signing in…" : "Creating account…";
 
   return (
-    <div className="bg-white">
+    // The wrapper's dark backdrop and badge are what the doors reveal when they open.
+    <div className="relative overflow-hidden bg-neutral-950">
+      <div
+        aria-live="polite"
+        className={`absolute inset-0 flex items-center justify-center transition-opacity duration-700 ${
+          opening ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        {opening && (
+          <span className="flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" aria-hidden />
+            Access Granted · Entering Workspace…
+          </span>
+        )}
+      </div>
       <div className="grid min-h-screen lg:grid-cols-2">
-        <aside className="hidden flex-col justify-between bg-neutral-950 p-12 text-white lg:flex">
+        <aside
+          className={`hidden flex-col justify-between bg-neutral-950 p-12 text-white transition-transform duration-700 ease-in-out motion-reduce:transition-none lg:flex ${
+            doorsApart ? "-translate-x-full opacity-90" : "translate-x-0"
+          }`}
+        >
           <div>
             <div className="flex items-center gap-2.5">
               <Hexagon className="h-7 w-7 text-indigo-400" aria-hidden />
@@ -245,7 +290,11 @@ export default function LoginForm() {
           </div>
         </aside>
 
-        <main className="flex flex-col items-center justify-center bg-neutral-50 px-4 py-10">
+        <main
+          className={`flex flex-col items-center justify-center bg-neutral-50 px-4 py-10 transition-all duration-700 ease-in-out motion-reduce:transition-none ${
+            doorsApart ? "opacity-0 max-lg:scale-95 lg:translate-x-full lg:opacity-90" : "translate-x-0 opacity-100"
+          }`}
+        >
           <div className="mb-6 flex items-center gap-2 lg:hidden">
             <Hexagon className="h-6 w-6 text-indigo-600" aria-hidden />
             <span className="font-semibold">DevOps Collab Workspace</span>
@@ -337,7 +386,7 @@ export default function LoginForm() {
                   )}
                   <button
                     type="submit"
-                    disabled={busy || (mode === "signup" && !signupReady)}
+                    disabled={busy || opening || (mode === "signup" && !signupReady)}
                     className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
                   >
                     {busy ? busyLabel : mode === "signin" ? "Sign in" : "Create account"}
