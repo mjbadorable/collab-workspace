@@ -31,7 +31,7 @@ import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import PokeballIcon from "@/components/pokeball-icon";
 import Avatar from "@/components/settings/avatar";
 import { mockWorkspace } from "@/lib/mock-data";
-import { useProfile } from "@/lib/profile-context";
+import { roleTone, useProfile } from "@/lib/profile-context";
 import { useProjects } from "@/lib/projects-context";
 
 const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
@@ -311,10 +311,10 @@ export default function Sidebar({
                 {displayName}
               </p>
               <p className="flex items-center gap-1.5 truncate text-xs text-neutral-500">
-                <span className="rounded bg-amber-400 px-1 text-[10px] font-semibold uppercase text-neutral-900">
-                  Trainer
+                <span className={`shrink-0 whitespace-nowrap rounded px-1 text-[10px] font-semibold uppercase ${roleTone(profile.role)}`}>
+                  {profile.role}
                 </span>
-                {user ? "Signed in" : "Local preview"} · Admin
+                <span className="min-w-0 truncate">{user ? "Signed in" : "Local preview"} · Admin</span>
               </p>
             </div>
             <button
