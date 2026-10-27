@@ -9,7 +9,6 @@ import {
   Circle,
   Eye,
   EyeOff,
-  Hexagon,
   Lock,
   Mail,
   Palette,
@@ -19,11 +18,12 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import PokeballIcon from "./pokeball-icon";
 
 type Mode = "signin" | "signup";
 
 const inputClass =
-  "w-full rounded-md border border-neutral-300 bg-white py-2 pl-9 pr-2.5 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
+  "w-full rounded-md border border-neutral-300 bg-white py-2 pl-9 pr-2.5 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500";
 
 const iconClass = "pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400";
 
@@ -111,7 +111,7 @@ function PasswordInput({
         onClick={onToggle}
         aria-label={shown ? "Hide password" : "Show password"}
         aria-pressed={shown}
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-neutral-400 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-neutral-400 hover:text-neutral-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
       >
         <ToggleIcon className="h-4 w-4" aria-hidden />
       </button>
@@ -189,7 +189,7 @@ export default function LoginForm() {
 
   const openDoors = () => {
     setOpening(true);
-    timer.current = setTimeout(() => router.replace("/"), 700);
+    timer.current = setTimeout(() => router.replace("/"), 1000);
   };
 
   const switchMode = (next: Mode) => {
@@ -246,22 +246,48 @@ export default function LoginForm() {
         }`}
       >
         {opening && (
-          <span className="flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900 px-4 py-2 text-sm text-neutral-200">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" aria-hidden />
-            Access Granted · Entering Workspace…
+          <span className="flex animate-pulse items-center gap-2 rounded-full border border-amber-400/60 bg-neutral-900 px-4 py-2 text-sm text-amber-300 shadow-[0_0_24px_rgba(251,191,36,0.45)]">
+            <span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden />
+            Wild Workspace Appeared! · Access Granted
           </span>
         )}
       </div>
+
+      {/* Bottom (white) half of the Pokéball. It sits above the left door, so it is its own layer that slides with the right door. */}
+      <span
+        className={`pointer-events-none absolute left-1/2 top-1/2 z-20 hidden h-[50px] w-[100px] rounded-b-full border-4 border-t-0 border-neutral-900 bg-white transition-transform duration-700 ease-in-out motion-reduce:transition-none lg:block ${
+          doorsApart ? "translate-x-[calc(50vw-50%)]" : "-translate-x-1/2"
+        }`}
+        aria-hidden
+      />
+
+      {/* Release button on the seam between the doors (desktop only). It flashes, then fades as the doors split. */}
+      <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 lg:block">
+        <span
+          className={`relative flex h-8 w-8 items-center justify-center rounded-full border-4 border-neutral-900 bg-white shadow-md transition-all duration-700 ease-out motion-reduce:transition-none ${
+            opening ? "scale-150 bg-amber-200 opacity-0 ring-8 ring-amber-300/70" : "ring-4 ring-red-400/50"
+          }`}
+        >
+          <span className="absolute h-3 w-3 animate-ping rounded-full bg-red-400/70 motion-reduce:animate-none" aria-hidden />
+          <span className={`relative h-3 w-3 rounded-full ${opening ? "bg-amber-400" : "bg-red-500"}`} aria-hidden />
+        </span>
+      </div>
+
       <div className="grid min-h-screen lg:grid-cols-2">
         <aside
-          className={`hidden flex-col justify-between bg-neutral-950 p-12 text-white transition-transform duration-700 ease-in-out motion-reduce:transition-none lg:flex ${
+          className={`relative z-10 hidden flex-col justify-between bg-neutral-950 p-12 text-white transition-transform duration-700 ease-in-out motion-reduce:transition-none lg:flex lg:pr-16 ${
             doorsApart ? "-translate-x-full opacity-90" : "translate-x-0"
           }`}
         >
+          {/* Top (red) half of the Pokéball rides on the left door. */}
+          <span
+            className="pointer-events-none absolute right-0 top-1/2 h-[50px] w-[100px] translate-x-1/2 -translate-y-full rounded-t-full border-4 border-b-8 border-neutral-900 bg-red-600"
+            aria-hidden
+          />
           <div>
             <div className="flex items-center gap-2.5">
-              <Hexagon className="h-7 w-7 text-indigo-400" aria-hidden />
-              <span className="text-lg font-semibold">DevOps Collab Workspace</span>
+              <PokeballIcon className="h-7 w-7" />
+              <span className="text-lg font-semibold">Silph DevOps · Collaborative Engineering Portal</span>
             </div>
             <h2 className="mt-16 max-w-lg text-4xl font-semibold leading-tight">
               The central engineering hub for agile software teams.
@@ -273,7 +299,7 @@ export default function LoginForm() {
             <ul className="mt-10 grid max-w-xl gap-3 sm:grid-cols-2">
               {features.map(({ icon: Icon, title, body }) => (
                 <li key={title} className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-                  <Icon className="h-5 w-5 text-indigo-400" aria-hidden />
+                  <Icon className="h-5 w-5 text-amber-400" aria-hidden />
                   <h3 className="mt-3 text-sm font-medium">{title}</h3>
                   <p className="mt-1 text-xs leading-relaxed text-neutral-400">{body}</p>
                 </li>
@@ -281,8 +307,8 @@ export default function LoginForm() {
             </ul>
           </div>
           <div className="mt-10 inline-flex w-fit items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900 px-3 py-1.5 text-xs text-neutral-300">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden />
-            All Systems Operational
+            <span className="h-2 w-2 animate-pulse rounded-full bg-amber-400" aria-hidden />
+            ⚡ Pokémon League Mainnet · Operational
             <span aria-hidden>·</span>
             v1.0 Production
             <span aria-hidden>·</span>
@@ -291,13 +317,13 @@ export default function LoginForm() {
         </aside>
 
         <main
-          className={`flex flex-col items-center justify-center bg-neutral-50 px-4 py-10 transition-all duration-700 ease-in-out motion-reduce:transition-none ${
+          className={`relative flex flex-col items-center justify-center bg-neutral-50 px-4 py-10 transition-all duration-700 ease-in-out motion-reduce:transition-none ${
             doorsApart ? "opacity-0 max-lg:scale-95 lg:translate-x-full lg:opacity-90" : "translate-x-0 opacity-100"
           }`}
         >
           <div className="mb-6 flex items-center gap-2 lg:hidden">
-            <Hexagon className="h-6 w-6 text-indigo-600" aria-hidden />
-            <span className="font-semibold">DevOps Collab Workspace</span>
+            <PokeballIcon className="h-6 w-6" />
+            <span className="font-semibold">Silph DevOps Portal</span>
           </div>
           <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
             <h1 className="text-lg font-semibold">Welcome to Collab Workspace</h1>
@@ -387,7 +413,7 @@ export default function LoginForm() {
                   <button
                     type="submit"
                     disabled={busy || opening || (mode === "signup" && !signupReady)}
-                    className="w-full rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+                    className="w-full rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
                   >
                     {busy ? busyLabel : mode === "signin" ? "Sign in" : "Create account"}
                   </button>

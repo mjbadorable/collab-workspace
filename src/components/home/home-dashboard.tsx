@@ -59,7 +59,7 @@ function WorkList({ items }: { items: StoredWorkItem[] | null }) {
         <button
           type="button"
           onClick={openDialog}
-          className="mt-4 flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+          className="mt-4 flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
         >
           <Plus className="h-4 w-4" aria-hidden /> New work item
         </button>
@@ -144,7 +144,7 @@ export default function HomeDashboard() {
           <Link
             key={href}
             href={href}
-            className="group flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-indigo-300"
+            className="group flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-red-300"
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-600">
               <Icon className="h-5 w-5" aria-hidden />
@@ -153,7 +153,7 @@ export default function HomeDashboard() {
               <span className="block text-sm font-medium">{title}</span>
               <span className="block text-xs text-neutral-500">{body}</span>
             </span>
-            <ArrowRight className="h-4 w-4 text-neutral-400 group-hover:text-indigo-600" aria-hidden />
+            <ArrowRight className="h-4 w-4 text-neutral-400 group-hover:text-red-600" aria-hidden />
           </Link>
         ))}
       </div>

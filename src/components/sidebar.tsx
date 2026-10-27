@@ -21,6 +21,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
+import PokeballIcon from "@/components/pokeball-icon";
 import { initials, mockProjects, mockUser, mockWorkspace, projectLinks } from "@/lib/mock-data";
 
 const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
@@ -69,9 +70,7 @@ export default function Sidebar({
             onClick={() => setSwitcherOpen((o) => !o)}
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-neutral-100"
           >
-            <span className="flex h-6 w-6 items-center justify-center rounded bg-indigo-600 text-xs font-semibold text-white">
-              {workspaceName[0]}
-            </span>
+            <PokeballIcon className="h-6 w-6 shrink-0" />
             <span className="flex-1 truncate text-sm font-medium">{workspaceName}</span>
             <ChevronsUpDown className="h-4 w-4 text-neutral-400" />
           </button>
@@ -94,7 +93,7 @@ export default function Sidebar({
                       className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-neutral-100"
                     >
                       <span className="flex-1 truncate">{w.name}</span>
-                      {w.id === current?.id && <Check className="h-4 w-4 text-indigo-600" />}
+                      {w.id === current?.id && <Check className="h-4 w-4 text-red-600" />}
                     </button>
                   ))}
                   {current && (
@@ -132,7 +131,7 @@ export default function Sidebar({
                       setSwitcherOpen(false);
                       onNavigate?.();
                     }}
-                    className="block rounded px-2 py-1.5 text-sm text-indigo-600 hover:bg-neutral-100"
+                    className="block rounded px-2 py-1.5 text-sm text-red-600 hover:bg-neutral-100"
                   >
                     Sign in to use cloud workspaces
                   </Link>
@@ -213,12 +212,17 @@ export default function Sidebar({
           <div className="h-12" aria-hidden />
         ) : (
           <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-semibold text-red-700">
               {user ? initials(emailName.replace(/[._-]+/g, " ")) || "?" : initials(mockUser.name)}
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{user ? user.email : mockUser.name}</p>
-              <p className="truncate text-xs text-neutral-500">{user ? "Signed in" : "Local preview"}</p>
+              <p className="flex items-center gap-1.5 truncate text-xs text-neutral-500">
+                <span className="rounded bg-amber-400 px-1 text-[10px] font-semibold uppercase text-neutral-900">
+                  Trainer
+                </span>
+                {user ? "Signed in" : "Local preview"} · Admin
+              </p>
             </div>
             {user ? (
               <button
@@ -234,7 +238,7 @@ export default function Sidebar({
                 <LogOut className="h-4 w-4" />
               </button>
             ) : (
-              <Link href="/login" onClick={onNavigate} className="text-xs font-medium text-indigo-600 hover:underline">
+              <Link href="/login" onClick={onNavigate} className="text-xs font-medium text-red-600 hover:underline">
                 Sign in
               </Link>
             )}

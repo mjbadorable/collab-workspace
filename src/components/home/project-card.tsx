@@ -20,7 +20,7 @@ export default function ProjectCard({ project, items }: { project: MockProject; 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-indigo-100 font-mono text-xs font-semibold text-indigo-700">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-linear-to-br from-red-500 to-amber-400 font-mono text-xs font-semibold text-white">
           {project.identifier}
         </span>
         <div className="min-w-0 flex-1">
@@ -30,7 +30,7 @@ export default function ProjectCard({ project, items }: { project: MockProject; 
             <span className="flex items-center gap-1 rounded-full border border-neutral-200 px-2 py-0.5">
               <Users className="h-3 w-3" aria-hidden /> 1 member
             </span>
-            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 font-medium text-indigo-700">
+            <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700">
               Admin
             </span>
           </div>
@@ -55,7 +55,7 @@ export default function ProjectCard({ project, items }: { project: MockProject; 
         >
           <div
             className={`h-full rounded-full transition-all duration-700 ease-out ${
-              percent === 100 ? "bg-emerald-500" : "bg-indigo-500"
+              percent === 100 ? "bg-emerald-500" : "bg-linear-to-r from-red-500 to-amber-400"
             }`}
             style={{ width: `${percent}%` }}
           />
