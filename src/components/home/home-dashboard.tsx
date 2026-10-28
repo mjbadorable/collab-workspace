@@ -6,8 +6,8 @@ import { ArrowRight, CheckCircle2, Clock, Inbox, Landmark, ListTodo, Network, Pl
 import Greeting from "@/components/greeting";
 import { priorityOptions, statusOptions } from "@/components/work-items/work-items-view";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
-import { useAuth } from "@/lib/auth-context";
-import { mockUser, mockWorkspace } from "@/lib/mock-data";
+import { mockWorkspace } from "@/lib/mock-data";
+import { useProfile } from "@/lib/profile-context";
 import { SEED_PROJECT, type ProjectRecord } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
 import { useWorkspaces } from "@/lib/workspace-context";
@@ -112,21 +112,17 @@ function WorkList({ items, project }: { items: StoredWorkItem[] | null; project:
 }
 
 export default function HomeDashboard() {
-  const { user } = useAuth();
+  const { displayName } = useProfile();
   const { current } = useWorkspaces();
   const { projects } = useProjects();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // The picked project, else the main one; falls back if the picked project was deleted.
   const selected = projects.find((p) => p.id === selectedId) ?? projects.find((p) => p.id === SEED_PROJECT.id) ?? projects[0] ?? SEED_PROJECT;
-  // Cloud users are named after their email; local preview keeps the mock user.
-  const name = user
-    ? (user.email ?? "there").split("@")[0].replace(/[._-]+/g, " ")
-    : mockUser.name.split(" ")[0];
   const workspaceName = current?.name ?? mockWorkspace.name;
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-8">
-      <Greeting name={name} />
+      <Greeting name={displayName} />
       <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-neutral-500">Here&apos;s what&apos;s on your plate in {workspaceName}.</p>
         {projects.length > 1 && (
