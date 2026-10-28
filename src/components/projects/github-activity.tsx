@@ -13,13 +13,42 @@ type Commit = {
   commitUrl: string;
 };
 
-type Activity = { defaultBranch: string; stars: number; forks: number; openIssues: number; commits: Commit[] };
+type PullState = "open" | "merged" | "closed";
+
+type Pull = {
+  number: number;
+  title: string;
+  state: PullState;
+  authorName: string;
+  authorAvatar: string | null;
+  date: string;
+  prUrl: string;
+};
+
+type Repo = { defaultBranch: string; stars: number; forks: number; openIssues: number; homepage: string | null };
+
+type Activity = Repo & { commits: Commit[]; pulls: Pull[] };
 
 type Result = { url: string; activity: Activity | null; error: string | null };
 
-type ApiResponse =
-  | { ok: true; repo: { defaultBranch: string; stars: number; forks: number; openIssues: number }; commits: Commit[] }
-  | { ok: false; error: string };
+type ApiResponse = { ok: true; repo: Repo; commits: Commit[]; pulls: Pull[] } | { ok: false; error: string };
+
+const PULL_BADGE: Record<PullState, { label: string; tone: string }> = {
+  open: { label: "Open", tone: "border-emerald-200 bg-emerald-50 text-emerald-700" },
+  merged: { label: "Merged", tone: "border-purple-200 bg-purple-50 text-purple-700" },
+  closed: { label: "Closed", tone: "border-neutral-200 bg-neutral-100 text-neutral-600" },
+};
+
+// Only http(s) links are rendered, whatever the repository's homepage field holds.
+const safeUrl = (value: string | null | undefined): string | null => {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  try {
+    return ["http:", "https:"].includes(new URL(trimmed).protocol) ? trimmed : null;
+  } catch {
+    return null;
+  }
+};
 
 const card = "rounded-lg border border-neutral-200 bg-white shadow-sm";
 
@@ -35,7 +64,7 @@ function timeAgo(iso: string): string {
   return `${days} ${days === 1 ? "day" : "days"} ago`;
 }
 
-function Avatar({ commit }: { commit: Commit }) {
+function Avatar({ commit }: { commit: Pick<Commit, "authorName" | "authorAvatar"> }) {
   const initials = commit.authorName
     .split(/\s+/)
     .map((w) => w[0])
@@ -55,9 +84,10 @@ function Avatar({ commit }: { commit: Commit }) {
   );
 }
 
-export default function GithubActivity({ githubUrl }: { githubUrl: string | null }) {
+export default function GithubActivity({ githubUrl, liveUrl = null }: { githubUrl: string | null; liveUrl?: string | null }) {
   const url = githubUrl?.trim() || null;
   const [result, setResult] = useState<Result | null>(null);
+  const [view, setView] = useState<"commits" | "pulls">("commits");
 
   useEffect(() => {
     if (!url) return;
@@ -65,7 +95,7 @@ export default function GithubActivity({ githubUrl }: { githubUrl: string | null
     fetch(`/api/github-activity?url=${encodeURIComponent(url)}`, { signal: controller.signal })
       .then((res) => res.json() as Promise<ApiResponse>)
       .then((data) => {
-        if (data.ok) setResult({ url, activity: { ...data.repo, commits: data.commits }, error: null });
+        if (data.ok) setResult({ url, activity: { ...data.repo, commits: data.commits, pulls: data.pulls }, error: null });
         else setResult({ url, activity: null, error: data.error });
       })
       .catch((err: unknown) => {
@@ -113,7 +143,10 @@ export default function GithubActivity({ githubUrl }: { githubUrl: string | null
     );
   }
 
-  const { defaultBranch, stars, forks, openIssues, commits } = current.activity;
+  const { defaultBranch, stars, forks, openIssues, commits, pulls, homepage } = current.activity;
+  const deployUrl = safeUrl(liveUrl) ?? safeUrl(homepage);
+  const tabClass = (active: boolean) =>
+    `rounded px-2.5 py-1 text-xs font-medium ${active ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-600 hover:text-neutral-900"}`;
 
   return (
     <section aria-labelledby="ov-github" className={card}>
@@ -125,6 +158,16 @@ export default function GithubActivity({ githubUrl }: { githubUrl: string | null
         <span className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-xs text-neutral-600">
           <GitBranch className="h-3 w-3" aria-hidden /> {defaultBranch}
         </span>
+        {deployUrl && (
+          <a
+            href={deployUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden /> Production Environment · Live ↗
+          </a>
+        )}
         <span className="ml-auto flex items-center gap-3 text-xs text-neutral-600">
           <span className="inline-flex items-center gap-1" title={`${forks} forks`}>
             <Star className="h-3.5 w-3.5 text-amber-500" aria-hidden /> {stars}
@@ -135,8 +178,47 @@ export default function GithubActivity({ githubUrl }: { githubUrl: string | null
           </span>
         </span>
       </header>
-      {commits.length > 0 ? (
-        <ul className="divide-y divide-neutral-100">
+      <div role="group" aria-label="Activity view" className="mx-4 mt-3 flex w-fit rounded-md bg-neutral-100 p-0.5">
+        <button type="button" aria-pressed={view === "commits"} onClick={() => setView("commits")} className={tabClass(view === "commits")}>
+          Commits ({commits.length})
+        </button>
+        <button type="button" aria-pressed={view === "pulls"} onClick={() => setView("pulls")} className={tabClass(view === "pulls")}>
+          Pull Requests ({pulls.length})
+        </button>
+      </div>
+      {view === "pulls" ? (
+        pulls.length > 0 ? (
+          <ul className="mt-2 divide-y divide-neutral-100">
+            {pulls.map((pr) => (
+              <li key={pr.number} className="flex items-center gap-3 px-4 py-2.5">
+                <Avatar commit={pr} />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-neutral-800" title={pr.title}>
+                    {pr.title}
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    {pr.authorName} · {timeAgo(pr.date)}
+                  </p>
+                </div>
+                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${PULL_BADGE[pr.state].tone}`}>
+                  {PULL_BADGE[pr.state].label}
+                </span>
+                <a
+                  href={pr.prUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="shrink-0 rounded bg-neutral-100 px-2 py-0.5 font-mono text-xs text-red-600 hover:bg-neutral-200"
+                >
+                  #{pr.number}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="px-4 py-3 text-sm text-neutral-500">No pull requests yet — commits push directly to the default branch.</p>
+        )
+      ) : commits.length > 0 ? (
+        <ul className="mt-2 divide-y divide-neutral-100">
           {commits.map((c) => (
             <li key={c.sha} className="flex items-center gap-3 px-4 py-2.5">
               <Avatar commit={c} />

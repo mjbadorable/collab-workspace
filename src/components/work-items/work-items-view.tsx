@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChevronRight, Kanban, List, ListChecks, Pencil, Plus, Trash2, type LucideIcon } from "lucide-react";
+import { ChevronRight, Kanban, List, ListChecks, Pencil, Plus, Search, Trash2, X, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { parseDescription, serializeDescription, taskProgress, type SubTask } from "@/lib/checklist";
 import { initials, mockUser } from "@/lib/mock-data";
 import { getProjects } from "@/lib/projects";
 import { useProfile } from "@/lib/profile-context";
@@ -158,6 +159,29 @@ const REMOTE_FLASH = "animate-pulse bg-indigo-50 ring-2 ring-indigo-400";
 
 const MAX_AVATARS = 3;
 
+// "☑ 2/4" with a mini progress bar; emerald once every sub-task is checked. Renders nothing without sub-tasks.
+function SubtaskPill({ tasks }: { tasks: SubTask[] }) {
+  if (tasks.length === 0) return null;
+  const { done, total, percent } = taskProgress(tasks);
+  const complete = done === total;
+  return (
+    <span
+      title={`${done} of ${total} sub-tasks done`}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${
+        complete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-neutral-200 bg-neutral-50 text-neutral-600"
+      }`}
+    >
+      <span aria-hidden>☑</span>
+      <span className="tabular-nums">
+        {done}/{total}
+      </span>
+      <span className="h-1 w-8 overflow-hidden rounded-full bg-neutral-200" aria-hidden>
+        <span className={`block h-full ${complete ? "bg-emerald-500" : "bg-indigo-500"}`} style={{ width: `${percent}%` }} />
+      </span>
+    </span>
+  );
+}
+
 function LiveStatusBadge({ cloud, status }: { cloud: boolean; status: "connected" | "connecting" | "offline" }) {
   const live = cloud && status === "connected";
   const connecting = cloud && status !== "connected";
@@ -240,6 +264,7 @@ function WorkItemRow({
 }) {
   const key = workItemKey(projectId, item.seq);
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
+  const { notes, tasks } = parseDescription(item.description);
 
   return (
     <li
@@ -259,8 +284,9 @@ function WorkItemRow({
         <p className={`truncate text-sm ${item.status === "done" ? "text-neutral-400 line-through" : ""}`}>
           {item.title}
         </p>
-        {item.description && <p className="truncate text-xs text-neutral-500">{item.description}</p>}
+        {notes && <p className="truncate text-xs text-neutral-500">{notes}</p>}
       </button>
+      <SubtaskPill tasks={tasks} />
       <PillSelect
         label={`Status of ${key}`}
         value={item.status}
@@ -332,6 +358,7 @@ function BoardCard({
 }) {
   const key = workItemKey(projectId, item.seq);
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
+  const { notes, tasks } = parseDescription(item.description);
 
   return (
     <li
@@ -371,8 +398,13 @@ function BoardCard({
         <p className={`text-sm font-medium ${item.status === "done" ? "text-neutral-400 line-through" : ""}`}>
           {item.title}
         </p>
-        {item.description && <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{item.description}</p>}
+        {notes && <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{notes}</p>}
       </button>
+      {tasks.length > 0 && (
+        <div className="mt-2">
+          <SubtaskPill tasks={tasks} />
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span
           className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${priority.tone}`}
@@ -529,14 +561,28 @@ function ItemForm({
   onSubmit: (input: NewWorkItemInput) => void;
   onCancel: () => void;
 }) {
+  const initialParts = parseDescription(initial?.description ?? null);
+  const [tasks, setTasks] = useState<SubTask[]>(initialParts.tasks);
+  const [draft, setDraft] = useState("");
+
+  const addTask = () => {
+    const text = draft.trim();
+    if (!text) return;
+    setTasks((prev) => [...prev, { text, done: false }]);
+    setDraft("");
+  };
+
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     const title = String(f.get("title") ?? "").trim();
     if (!title) return;
+    // A sub-task typed but not yet added still counts.
+    const pending = draft.trim();
+    const allTasks = pending ? [...tasks, { text: pending, done: false }] : tasks;
     onSubmit({
       title,
-      description: String(f.get("description") ?? ""),
+      description: serializeDescription(String(f.get("description") ?? ""), allTasks) ?? "",
       status: f.get("status") as WorkItemStatus,
       priority: f.get("priority") as WorkItemPriority,
       assignee_id: String(f.get("assignee") ?? "") || null,
@@ -571,10 +617,62 @@ function ItemForm({
           id="wi-description"
           name="description"
           rows={3}
-          defaultValue={initial?.description ?? ""}
+          defaultValue={initialParts.notes}
           className={`${fieldClass} resize-none`}
         />
       </div>
+      <fieldset>
+        <legend className="mb-1 block text-xs font-medium text-neutral-600">
+          Sub-tasks / Checklist{tasks.length > 0 && ` (${taskProgress(tasks).done}/${tasks.length})`}
+        </legend>
+        {tasks.length > 0 && (
+          <ul className="mb-2 space-y-1">
+            {tasks.map((t, i) => (
+              <li key={i} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={t.done}
+                  aria-label={`Mark "${t.text}" ${t.done ? "not done" : "done"}`}
+                  onChange={() => setTasks((prev) => prev.map((p, j) => (j === i ? { ...p, done: !p.done } : p)))}
+                  className="h-4 w-4 accent-indigo-600"
+                />
+                <span className={`min-w-0 flex-1 truncate ${t.done ? "text-neutral-400 line-through" : ""}`}>{t.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setTasks((prev) => prev.filter((_, j) => j !== i))}
+                  aria-label={`Remove "${t.text}"`}
+                  className="rounded p-0.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex gap-2">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault(); // Enter adds the sub-task instead of submitting the form
+                addTask();
+              }
+            }}
+            aria-label="New sub-task"
+            placeholder="Add a sub-task…"
+            maxLength={200}
+            className={fieldClass}
+          />
+          <button
+            type="button"
+            onClick={addTask}
+            className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+          >
+            Add
+          </button>
+        </div>
+      </fieldset>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="wi-status" className="mb-1 block text-xs font-medium text-neutral-600">
@@ -674,14 +772,34 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
       return "list";
     }
   });
-  const chooseView = (next: ViewMode) => {
+  const chooseView = useCallback((next: ViewMode) => {
     setViewMode(next);
     try {
       localStorage.setItem(VIEW_KEY, next);
     } catch {
       // storage blocked: the choice just won't persist
     }
-  };
+  }, []);
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Board shortcuts: "/" search, "b" board, "l" list. Ignored while typing, with modifiers, or with a dialog open.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      if (document.querySelector("dialog[open]")) return;
+      const key = e.key.toLowerCase();
+      if (key === "/") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      } else if (key === "b") chooseView("board");
+      else if (key === "l") chooseView("list");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [chooseView]);
   // In the cloud, assignees are real auth users; local preview keeps the mock user.
   const me: Me = workspaceId && user ? { id: user.id, name: displayName } : mockUser;
   // Everyone who can be assigned: the workspace's members in the cloud, just the mock user in local preview.
@@ -709,7 +827,17 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     if (!editingItem && dialog.open) dialog.close();
   }, [editingItem]);
 
-  const live = items.filter((i) => !i.deleted_at).sort((a, b) => a.seq - b.seq);
+  const needle = query.trim().toLowerCase();
+  const live = items
+    .filter((i) => !i.deleted_at)
+    .filter(
+      (i) =>
+        !needle ||
+        workItemKey(projectId, i.seq).toLowerCase().includes(needle) ||
+        i.title.toLowerCase().includes(needle) ||
+        parseDescription(i.description).notes.toLowerCase().includes(needle)
+    )
+    .sort((a, b) => a.seq - b.seq);
   const visible = filter === "all" ? live : live.filter((i) => i.status === filter);
   const count = (f: Filter) => (f === "all" ? live.length : live.filter((i) => i.status === f).length);
   const projectName = getProjects().find((p) => p.id === projectId)?.name ?? projectId;
@@ -758,30 +886,54 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
         </p>
       )}
 
-      {viewMode === "list" && (
-      <div role="tablist" aria-label="Filter by status" className="flex gap-1 border-b border-neutral-200 px-4 py-2">
-        {filters.map((f) => {
-          const active = filter === f.value;
-          return (
-            <button
-              key={f.value}
-              role="tab"
-              type="button"
-              aria-selected={active}
-              onClick={() => setFilter(f.value)}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${
-                active ? "bg-neutral-200 font-medium text-neutral-900" : "text-neutral-600 hover:bg-neutral-100"
-              }`}
-            >
-              {f.label}
-              <span className="rounded-full bg-white px-1.5 text-xs text-neutral-500 ring-1 ring-neutral-200">
-                {count(f.value)}
-              </span>
-            </button>
-          );
-        })}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-neutral-200 px-4 py-2">
+        {viewMode === "list" && (
+          <div role="tablist" aria-label="Filter by status" className="flex gap-1">
+            {filters.map((f) => {
+              const active = filter === f.value;
+              return (
+                <button
+                  key={f.value}
+                  role="tab"
+                  type="button"
+                  aria-selected={active}
+                  onClick={() => setFilter(f.value)}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${
+                    active ? "bg-neutral-200 font-medium text-neutral-900" : "text-neutral-600 hover:bg-neutral-100"
+                  }`}
+                >
+                  {f.label}
+                  <span className="rounded-full bg-white px-1.5 text-xs text-neutral-500 ring-1 ring-neutral-200">
+                    {count(f.value)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" aria-hidden />
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                setQuery("");
+                e.currentTarget.blur();
+              }
+            }}
+            aria-label="Search work items"
+            placeholder="Search work items…"
+            className="w-48 rounded-md border border-neutral-300 bg-white py-1 pl-7 pr-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+          />
+        </div>
+        <p className="ml-auto hidden text-xs text-neutral-500 md:block">
+          Shortcuts: <kbd className="font-mono">C</kbd> new · <kbd className="font-mono">/</kbd> search ·{" "}
+          <kbd className="font-mono">B</kbd> board · <kbd className="font-mono">L</kbd> list
+        </p>
       </div>
-      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {allItems === null ? (
@@ -805,9 +957,13 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center px-6 py-16 text-center">
             <ListChecks className="h-8 w-8 text-neutral-400" />
-            <p className="mt-3 text-sm font-medium">{filter === "all" ? "No work items yet" : "Nothing here"}</p>
+            <p className="mt-3 text-sm font-medium">{filter === "all" && !needle ? "No work items yet" : "Nothing here"}</p>
             <p className="mt-1 text-sm text-neutral-500">
-              {filter === "all" ? "Press C or use New work item to add one." : "No work items match this filter."}
+              {needle
+                ? "No work items match your search."
+                : filter === "all"
+                  ? "Press C or use New work item to add one."
+                  : "No work items match this filter."}
             </p>
           </div>
         ) : (

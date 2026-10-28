@@ -7,6 +7,7 @@ import ProjectAvatar, { isPokeballProject } from "@/components/project-avatar";
 import type { ProjectRecord } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
 import type { StoredWorkItem } from "@/lib/work-items-storage";
+import { UptimeBadge, UptimeSparkline } from "./health-pill";
 import { healthDot, healthLabel, useHealth } from "./use-health";
 
 export function progressOf(items: StoredWorkItem[] | null) {
@@ -25,7 +26,7 @@ const isHttpUrl = (value: string) => {
 
 function HealthMonitor({ project }: { project: ProjectRecord }) {
   const { updateProject } = useProjects();
-  const { health, recheck } = useHealth(project.live_url);
+  const { health, history, uptimePercent, recheck } = useHealth(project.live_url);
   const [editing, setEditing] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -80,6 +81,13 @@ function HealthMonitor({ project }: { project: ProjectRecord }) {
           <Pencil className="h-3.5 w-3.5" aria-hidden />
         </button>
       </div>
+
+      {project.live_url && (
+        <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+          <UptimeSparkline history={history} />
+          {uptimePercent === null ? <span className="text-neutral-400">No history yet</span> : <UptimeBadge percent={uptimePercent} />}
+        </div>
+      )}
 
       <div className="mt-2 flex flex-wrap gap-2 text-xs">
         {project.github_url && (

@@ -6,7 +6,23 @@ const COMMIT_COUNT = 5;
 const API_HOST = "https://api.github.com";
 const NAME_PATTERN = /^[A-Za-z0-9_.-]{1,100}$/;
 
-type RepoResponse = { default_branch: string; stargazers_count: number; forks_count: number; open_issues_count: number };
+type RepoResponse = {
+  default_branch: string;
+  stargazers_count: number;
+  forks_count: number;
+  open_issues_count: number;
+  homepage: string | null;
+};
+type PullResponse = {
+  number: number;
+  title: string;
+  state: string;
+  merged_at: string | null;
+  user: { login: string; avatar_url: string } | null;
+  created_at: string;
+  updated_at: string;
+  html_url: string;
+};
 type CommitResponse = {
   sha: string;
   html_url: string;
@@ -52,15 +68,23 @@ export async function GET(request: Request) {
   const { owner, repo } = parsed;
 
   try {
-    const [repoRes, commitsRes] = await Promise.all([
+    const [repoRes, commitsRes, pullsRes] = await Promise.all([
       github(`/repos/${owner}/${repo}`),
       github(`/repos/${owner}/${repo}/commits?per_page=${COMMIT_COUNT}`),
+      // Pull requests are a bonus: if they fail, the rest of the widget still works.
+      github(`/repos/${owner}/${repo}/pulls?state=all&per_page=${COMMIT_COUNT}`).catch(() => null),
     ]);
     if (!repoRes.ok) return fail(statusError(repoRes.status));
     if (!commitsRes.ok) return fail(statusError(commitsRes.status));
 
     const meta = (await repoRes.json()) as RepoResponse;
     const commits = (await commitsRes.json()) as CommitResponse[];
+    let pulls: PullResponse[] = [];
+    try {
+      if (pullsRes?.ok) pulls = (await pullsRes.json()) as PullResponse[];
+    } catch {
+      pulls = [];
+    }
 
     return Response.json({
       ok: true,
@@ -69,7 +93,17 @@ export async function GET(request: Request) {
         stars: meta.stargazers_count,
         forks: meta.forks_count,
         openIssues: meta.open_issues_count,
+        homepage: meta.homepage || null,
       },
+      pulls: pulls.slice(0, COMMIT_COUNT).map((pr) => ({
+        number: pr.number,
+        title: pr.title,
+        state: pr.merged_at ? "merged" : pr.state === "open" ? "open" : "closed",
+        authorName: pr.user?.login ?? "Unknown",
+        authorAvatar: pr.user?.avatar_url ?? null,
+        date: pr.updated_at || pr.created_at,
+        prUrl: pr.html_url,
+      })),
       commits: commits.slice(0, COMMIT_COUNT).map((c) => ({
         sha: c.sha,
         shortSha: c.sha.slice(0, 7),

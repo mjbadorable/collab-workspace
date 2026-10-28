@@ -62,6 +62,42 @@ async function seedEmptyCloudProject(
   return fetchCloudWorkItems(projectUuid);
 }
 
+// One-time cloud upgrade so a workspace seeded before CW-6..CW-9 finished gets the missing items and marks CW-1..CW-9 done.
+async function upgradeCollabCloudProject(
+  projectUuid: string,
+  projectId: string,
+  current: StoredWorkItem[],
+  isCancelled: () => boolean
+): Promise<StoredWorkItem[]> {
+  if (projectId !== "collab-workspace") return current;
+  const guard = `collab-workspace:cloud-nextgen-v1:${projectUuid}`;
+  try {
+    if (localStorage.getItem(guard)) return current;
+    localStorage.setItem(guard, "1");
+  } catch {
+    return current;
+  }
+  const seeds = seedItems("collab-workspace");
+  let changed = false;
+  for (const s of seeds) {
+    if (isCancelled()) return current;
+    const match = current.find((r) => !r.deleted_at && r.title === s.title);
+    if (!match) {
+      await insertCloudWorkItem(projectUuid, {
+        title: s.title,
+        description: s.description ?? "",
+        status: "done",
+        priority: s.priority,
+      });
+      changed = true;
+    } else if (match.status !== "done") {
+      await updateCloudWorkItem(match.id, { status: "done" });
+      changed = true;
+    }
+  }
+  return changed ? fetchCloudWorkItems(projectUuid) : current;
+}
+
 // One project's work items. With a workspaceId they live in Supabase (and stay live via Realtime, with presence);
 // without one they live in localStorage and sync across tabs. The source is fixed for the hook's lifetime, so
 // callers remount it (key) when the workspace changes.
@@ -176,6 +212,7 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
         });
         let rows = await fetchCloudWorkItems(pid);
         if (rows.length === 0) rows = await seedEmptyCloudProject(pid, projectId, rows, () => cancelled);
+        else rows = await upgradeCollabCloudProject(pid, projectId, rows, () => cancelled);
         if (!cancelled) setItems(rows);
       } catch (e) {
         if (!cancelled) {

@@ -56,10 +56,10 @@ export function seedItems(projectId: string): StoredWorkItem[] {
       seed(3, "Workspace-level member role permissions (Admin vs Member granular gates)", "done", "medium", mockUser.id),
       seed(4, "Export project telemetry and architecture blueprint as printable PDF report", "done", "low", mockUser.id),
       seed(5, "Plug & Play GitHub repo breakdown and auto-task generation", "done", "high", mockUser.id),
-      seed(6, "Command Palette (Ctrl+K / Cmd+K) for instant project, ticket, and diagram navigation", "in_progress", "high", mockUser.id),
-      seed(7, "Automated Uptime History Sparkline & Webhook Alerts (Discord/Slack) on health check failure", "backlog", "high", null),
-      seed(8, "GitHub PR & Deployment Environment Statuses (Vercel preview links) in Commit Stream", "backlog", "medium", null),
-      seed(9, "Kanban Keyboard Shortcuts, Due Dates, and Sub-task Checklists on Work Items", "backlog", "medium", null),
+      seed(6, "Command Palette (Ctrl+K / Cmd+K) for instant project, ticket, and diagram navigation", "done", "high", mockUser.id),
+      seed(7, "Automated Uptime History Sparkline & Webhook Alerts (Discord/Slack) on health check failure", "done", "high", mockUser.id),
+      seed(8, "GitHub PR & Deployment Environment Statuses (Vercel preview links) in Commit Stream", "done", "medium", mockUser.id),
+      seed(9, "Kanban Keyboard Shortcuts, Due Dates, and Sub-task Checklists on Work Items", "done", "medium", mockUser.id),
     ];
   }
 
@@ -83,12 +83,28 @@ export function seedItems(projectId: string): StoredWorkItem[] {
   ];
 }
 
+const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v1";
+
+// One-time upgrade of a board saved before CW-6..CW-9 shipped: adds the missing seed items and marks CW-1..CW-9 done.
+function upgradeCollabBoard(items: StoredWorkItem[]): StoredWorkItem[] {
+  const upgraded = items.map((i) => (i.seq <= 9 && i.status !== "done" ? { ...i, status: "done" as const } : i));
+  const missing = seedItems("collab-workspace").filter((s) => !items.some((i) => i.seq === s.seq));
+  return [...upgraded, ...missing].sort((a, b) => a.seq - b.seq);
+}
+
 export function loadWorkItems(projectId: string): StoredWorkItem[] {
   try {
     const raw = localStorage.getItem(storageKey(projectId));
     if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const stored = parsed as StoredWorkItem[];
+        if (projectId !== "collab-workspace" || localStorage.getItem(NEXTGEN_FLAG)) return stored;
+        const upgraded = upgradeCollabBoard(stored);
+        saveWorkItems(projectId, upgraded);
+        localStorage.setItem(NEXTGEN_FLAG, "1");
+        return upgraded;
+      }
     }
   } catch {
     // corrupt JSON or storage unavailable: fall back to the seed data

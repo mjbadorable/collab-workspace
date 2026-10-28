@@ -19,6 +19,7 @@ import {
   LogOut,
   Pencil,
   Plus,
+  Search,
   Settings,
   Trash2,
   User,
@@ -64,11 +65,13 @@ export default function Sidebar({
   onNewWorkspace,
   onInvite,
   onEditProfile,
+  onSearch,
 }: {
   onNavigate?: () => void;
   onNewWorkspace: () => void;
   onInvite: () => void;
   onEditProfile: () => void;
+  onSearch: () => void;
 }) {
   const pathname = usePathname();
   const activeCategory = useSearchParams().get("category") ?? "user";
@@ -182,6 +185,17 @@ export default function Sidebar({
           <kbd className="rounded border border-neutral-200 bg-neutral-50 px-1.5 font-mono text-[10px] text-neutral-500">
             C
           </kbd>
+        </button>
+
+        <button
+          type="button"
+          onClick={onSearch}
+          aria-label="Search and jump (Ctrl+K)"
+          className="flex w-full items-center gap-2 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-500 shadow-sm hover:bg-neutral-100"
+        >
+          <Search className="h-4 w-4" aria-hidden />
+          <span className="flex-1 text-left">Search &amp; jump…</span>
+          <kbd className="rounded border border-neutral-200 bg-neutral-50 px-1.5 font-mono text-[10px] text-neutral-500">Ctrl K</kbd>
         </button>
       </div>
 

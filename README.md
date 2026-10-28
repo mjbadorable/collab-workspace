@@ -115,6 +115,10 @@ collab-workspace/
 | `CW-3` | Workspace-level member role permissions (Admin vs Member granular gates) | Done | Medium |
 | `CW-4` | Export project telemetry and architecture blueprint as printable PDF report | Done | Low |
 | `CW-5` | Plug & Play GitHub repo breakdown and auto-task generation | Done | High |
+| `CW-6` | Command Palette (Ctrl+K / Cmd+K) for instant project, ticket, and diagram navigation | Done | High |
+| `CW-7` | Automated Uptime History Sparkline & Webhook Alerts (Discord/Slack) on health check failure | Done | High |
+| `CW-8` | GitHub PR & Deployment Environment Statuses (Vercel preview links) in Commit Stream | Done | Medium |
+| `CW-9` | Kanban Keyboard Shortcuts, Due Dates, and Sub-task Checklists on Work Items | Done | Medium |
 
 ---
 

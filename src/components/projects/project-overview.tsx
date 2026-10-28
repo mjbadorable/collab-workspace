@@ -250,7 +250,7 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
         </div>
       </section>
 
-      <GithubActivity githubUrl={project.github_url} />
+      <GithubActivity githubUrl={project.github_url} liveUrl={project.live_url} />
 
       <FlowchartPipeline key={project.id} projectId={project.id} />
 

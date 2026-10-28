@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { ProfileProvider } from "@/lib/profile-context";
 import { ProjectsProvider } from "@/lib/projects-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
+import CommandPalette from "./command-palette";
 import EditProfileDialog from "./settings/edit-profile-dialog";
 import InviteDialog from "./settings/invite-dialog";
 import Sidebar from "./sidebar";
@@ -38,6 +39,7 @@ function Chrome({ children }: { children: ReactNode }) {
   const [workspaceRequested, setWorkspaceRequested] = useState(false);
   const [inviteRequested, setInviteRequested] = useState(false);
   const [profileRequested, setProfileRequested] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const pathname = usePathname();
 
   // The login page is a full-screen landing page: no sidebar, mobile header or workspace dialog.
@@ -49,7 +51,12 @@ function Chrome({ children }: { children: ReactNode }) {
       {/* Desktop: fixed sidebar */}
       <aside className="hidden md:block">
         <Suspense fallback={<SidebarFallback />}>
-          <Sidebar onNewWorkspace={() => setWorkspaceRequested(true)} onInvite={() => setInviteRequested(true)} onEditProfile={() => setProfileRequested(true)} />
+          <Sidebar
+            onNewWorkspace={() => setWorkspaceRequested(true)}
+            onInvite={() => setInviteRequested(true)}
+            onEditProfile={() => setProfileRequested(true)}
+            onSearch={() => setPaletteOpen(true)}
+          />
         </Suspense>
       </aside>
 
@@ -71,6 +78,10 @@ function Chrome({ children }: { children: ReactNode }) {
                 onEditProfile={() => {
                   setMobileOpen(false);
                   setProfileRequested(true);
+                }}
+                onSearch={() => {
+                  setMobileOpen(false);
+                  setPaletteOpen(true);
                 }}
               />
             </Suspense>
@@ -104,6 +115,12 @@ function Chrome({ children }: { children: ReactNode }) {
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
     <InviteDialog open={inviteRequested} onClose={() => setInviteRequested(false)} />
     <EditProfileDialog open={profileRequested} onClose={() => setProfileRequested(false)} />
+    <CommandPalette
+      open={paletteOpen}
+      onOpenChange={setPaletteOpen}
+      onNewWorkspace={() => setWorkspaceRequested(true)}
+      onEditProfile={() => setProfileRequested(true)}
+    />
     </NewWorkItemProvider>
   );
 }
