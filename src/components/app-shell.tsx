@@ -8,6 +8,7 @@ import { ProfileProvider } from "@/lib/profile-context";
 import { ProjectsProvider } from "@/lib/projects-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import CommandPalette from "./command-palette";
+import TeamRoomDock from "./projects/team-room-dock";
 import EditProfileDialog from "./settings/edit-profile-dialog";
 import InviteDialog from "./settings/invite-dialog";
 import Sidebar from "./sidebar";
@@ -41,6 +42,8 @@ function Chrome({ children }: { children: ReactNode }) {
   const [profileRequested, setProfileRequested] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const pathname = usePathname();
+  // The Team Room belongs to the project whose pages are open.
+  const projectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] ?? null;
 
   // The login page is a full-screen landing page: no sidebar, mobile header or workspace dialog.
   if (pathname === "/login") return <>{children}</>;
@@ -115,6 +118,7 @@ function Chrome({ children }: { children: ReactNode }) {
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
     <InviteDialog open={inviteRequested} onClose={() => setInviteRequested(false)} />
     <EditProfileDialog open={profileRequested} onClose={() => setProfileRequested(false)} />
+    {projectId && <TeamRoomDock key={projectId} projectId={projectId} />}
     <CommandPalette
       open={paletteOpen}
       onOpenChange={setPaletteOpen}

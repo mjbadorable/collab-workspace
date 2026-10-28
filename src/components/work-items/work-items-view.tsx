@@ -3,7 +3,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChevronRight, Kanban, List, ListChecks, Pencil, Plus, Search, Trash2, X, type LucideIcon } from "lucide-react";
+import {
+  ArrowUpDown,
+  ChevronRight,
+  GitCommitHorizontal as GitCommit,
+  GitPullRequest,
+  Kanban,
+  List,
+  ListChecks,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
   dueBadge,
@@ -33,6 +47,7 @@ import {
   type WorkItemPriority,
   type WorkItemStatus,
 } from "@/lib/work-items-storage";
+import ImportExportDialog from "./import-export-dialog";
 import { useNewWorkItem } from "./new-work-item-context";
 
 type Filter = "all" | WorkItemStatus;
@@ -206,23 +221,63 @@ function SubtaskPill({ tasks, expanded, onToggle }: { tasks: SubTask[]; expanded
 }
 
 // Type label and due-date badges shown on cards and rows.
+// Links into the project's repository; without a usable github_url the badge is shown but is not clickable.
+function repoLink(githubUrl: string, path: string): string | null {
+  return /^https?:\/\//i.test(githubUrl) ? `${githubUrl.replace(/\/+$/, "").replace(/\.git$/i, "")}/${path}` : null;
+}
+
+function GitBadge({ href, icon: Icon, children, title }: { href: string | null; icon: LucideIcon; children: ReactNode; title: string }) {
+  const className =
+    "inline-flex shrink-0 items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-xs text-neutral-600";
+  const content = (
+    <>
+      <Icon className="h-3 w-3" aria-hidden /> {children}
+    </>
+  );
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" title={title} className={`${className} hover:border-indigo-300 hover:text-indigo-700`}>
+      {content}
+    </a>
+  ) : (
+    <span title={title} className={className}>
+      {content}
+    </span>
+  );
+}
+
 function ItemMeta({
   label,
   dueDate,
   cycle,
   module,
+  commit,
+  pr,
+  githubUrl,
   status,
 }: {
   label: WorkItemLabel | null;
   dueDate: string | null;
   cycle: string | null;
   module: string | null;
+  commit: string | null;
+  pr: string | null;
+  githubUrl: string;
   status: WorkItemStatus;
 }) {
   const due = dueBadge(dueDate, status);
-  if (!label && !due && !cycle && !module) return null;
+  if (!label && !due && !cycle && !module && !commit && !pr) return null;
   return (
     <>
+      {commit && (
+        <GitBadge href={repoLink(githubUrl, `commit/${commit}`)} icon={GitCommit} title={`Commit ${commit}`}>
+          #{commit.slice(0, 7)}
+        </GitBadge>
+      )}
+      {pr && (
+        <GitBadge href={repoLink(githubUrl, `pull/${pr}`)} icon={GitPullRequest} title={`Pull request #${pr}`}>
+          PR #{pr}
+        </GitBadge>
+      )}
       {label && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${labelTone(label)}`}>{label}</span>}
       {cycle && (
         <span title={`Cycle: ${cycle}`} className="max-w-40 shrink-0 truncate rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600">
@@ -305,6 +360,7 @@ function WorkItemRow({
   projectId,
   me,
   people,
+  githubUrl,
   remote,
   onChange,
   onEdit,
@@ -314,6 +370,7 @@ function WorkItemRow({
   projectId: string;
   me: Me;
   people: Person[];
+  githubUrl: string;
   remote: boolean;
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
@@ -345,7 +402,16 @@ function WorkItemRow({
         {notes && <p className="truncate text-xs text-neutral-500">{notes}</p>}
       </button>
       <SubtaskPill tasks={tasks} />
-      <ItemMeta label={parsed.label} dueDate={parsed.dueDate} cycle={parsed.cycle} module={parsed.module} status={item.status} />
+      <ItemMeta
+        label={parsed.label}
+        dueDate={parsed.dueDate}
+        cycle={parsed.cycle}
+        module={parsed.module}
+        commit={parsed.commit}
+        pr={parsed.pr}
+        githubUrl={githubUrl}
+        status={item.status}
+      />
       <PillSelect
         label={`Status of ${key}`}
         value={item.status}
@@ -401,6 +467,7 @@ function BoardCard({
   projectId,
   me,
   people,
+  githubUrl,
   remote,
   onChange,
   onEdit,
@@ -410,6 +477,7 @@ function BoardCard({
   projectId: string;
   me: Me;
   people: Person[];
+  githubUrl: string;
   remote: boolean;
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
@@ -430,6 +498,8 @@ function BoardCard({
         dueDate: parsed.dueDate,
         cycle: parsed.cycle,
         module: parsed.module,
+        commit: parsed.commit,
+        pr: parsed.pr,
       }),
     });
   };
@@ -474,10 +544,19 @@ function BoardCard({
         </p>
         {notes && <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{notes}</p>}
       </button>
-      {(tasks.length > 0 || parsed.label || parsed.dueDate || parsed.cycle || parsed.module) && (
+      {(tasks.length > 0 || parsed.label || parsed.dueDate || parsed.cycle || parsed.module || parsed.commit || parsed.pr) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <SubtaskPill tasks={tasks} expanded={showTasks} onToggle={() => setShowTasks((v) => !v)} />
-          <ItemMeta label={parsed.label} dueDate={parsed.dueDate} cycle={parsed.cycle} module={parsed.module} status={item.status} />
+          <ItemMeta
+            label={parsed.label}
+            dueDate={parsed.dueDate}
+            cycle={parsed.cycle}
+            module={parsed.module}
+            commit={parsed.commit}
+            pr={parsed.pr}
+            githubUrl={githubUrl}
+            status={item.status}
+          />
         </div>
       )}
       {showTasks && tasks.length > 0 && (
@@ -529,6 +608,7 @@ function KanbanBoard({
   projectId,
   me,
   people,
+  githubUrl,
   remoteUpdatedIds,
   onChange,
   onEdit,
@@ -540,6 +620,7 @@ function KanbanBoard({
   projectId: string;
   me: Me;
   people: Person[];
+  githubUrl: string;
   remoteUpdatedIds: ReadonlySet<string>;
   onChange: (id: string, patch: Partial<StoredWorkItem>) => void;
   onEdit: (item: StoredWorkItem) => void;
@@ -606,6 +687,7 @@ function KanbanBoard({
                   projectId={projectId}
                   me={me}
                   people={people}
+                  githubUrl={githubUrl}
                   remote={remoteUpdatedIds.has(item.id)}
                   onChange={(patch) => onChange(item.id, patch)}
                   onEdit={() => onEdit(item)}
@@ -685,6 +767,8 @@ function ItemForm({
           dueDate: String(f.get("due") ?? "") || null,
           cycle: String(f.get("cycle") ?? "") || null,
           module: String(f.get("module") ?? "") || null,
+          commit: String(f.get("commit") ?? "").trim() || null,
+          pr: String(f.get("pr") ?? "").trim() || null,
         }) ?? "",
       status: f.get("status") as WorkItemStatus,
       priority: f.get("priority") as WorkItemPriority,
@@ -771,6 +855,39 @@ function ItemForm({
               </option>
             ))}
           </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="wi-commit" className="mb-1 block text-xs font-medium text-neutral-600">
+            Linked Commit SHA <span className="font-normal text-neutral-400">(optional)</span>
+          </label>
+          <input
+            id="wi-commit"
+            name="commit"
+            defaultValue={initialParts.commit ?? ""}
+            pattern="[a-fA-F0-9]{7,40}"
+            title="7 to 40 hexadecimal characters"
+            maxLength={40}
+            placeholder="1053a36"
+            className={`${fieldClass} font-mono`}
+          />
+        </div>
+        <div>
+          <label htmlFor="wi-pr" className="mb-1 block text-xs font-medium text-neutral-600">
+            Linked Pull Request # <span className="font-normal text-neutral-400">(optional)</span>
+          </label>
+          <input
+            id="wi-pr"
+            name="pr"
+            defaultValue={initialParts.pr ?? ""}
+            pattern="#?[0-9]+"
+            title="A pull request number, like 42"
+            inputMode="numeric"
+            maxLength={8}
+            placeholder="42"
+            className={`${fieldClass} font-mono`}
+          />
         </div>
       </div>
       <fieldset>
@@ -933,6 +1050,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     }
   }, []);
   const [query, setQuery] = useState("");
+  const [transferring, setTransferring] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Board shortcuts: "/" search, "b" board, "l" list. Ignored while typing, with modifiers, or with a dialog open.
@@ -996,7 +1114,9 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     .sort((a, b) => a.seq - b.seq);
   const visible = filter === "all" ? live : live.filter((i) => i.status === filter);
   const count = (f: Filter) => (f === "all" ? live.length : live.filter((i) => i.status === f).length);
-  const projectName = getProjects().find((p) => p.id === projectId)?.name ?? projectId;
+  const projectRecord = getProjects().find((p) => p.id === projectId);
+  const projectName = projectRecord?.name ?? projectId;
+  const githubUrl = projectRecord?.github_url ?? "";
 
   return (
     <div className="flex h-full flex-col">
@@ -1026,6 +1146,13 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() => setTransferring(true)}
+            className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-neutral-700 hover:bg-neutral-100"
+          >
+            <ArrowUpDown className="h-4 w-4" aria-hidden /> Import / Export
+          </button>
           <button
             type="button"
             onClick={openDialog}
@@ -1101,6 +1228,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             projectId={projectId}
             me={me}
             people={people}
+            githubUrl={githubUrl}
             remoteUpdatedIds={remoteUpdatedIds}
             onChange={update}
             onEdit={setEditingItem}
@@ -1131,6 +1259,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
                 projectId={projectId}
                 me={me}
                 people={people}
+                githubUrl={githubUrl}
                 remote={remoteUpdatedIds.has(item.id)}
                 onChange={(patch) => update(item.id, patch)}
                 onEdit={() => setEditingItem(item)}
@@ -1140,6 +1269,17 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
           </ul>
         )}
       </div>
+
+      <ImportExportDialog
+        open={transferring}
+        onClose={() => setTransferring(false)}
+        projectId={projectId}
+        items={items}
+        onImport={(inputs) => {
+          inputs.forEach(add);
+          setFilter("all");
+        }}
+      />
 
       <dialog
         ref={dialogRef}

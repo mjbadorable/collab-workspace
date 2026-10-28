@@ -67,6 +67,11 @@ export function seedItems(projectId: string): StoredWorkItem[] {
       seed(13, "Interactive Architecture & Flowchart Node Inspector with Runbook Notes", "done", "medium", mockUser.id),
       seed(14, "Project Analytics & Velocity Dashboard with pure-SVG charts", "done", "medium", mockUser.id),
       seed(15, "Dark Mode Theme Switcher: Poké-Center Light vs. Silph Co. Dark", "done", "low", mockUser.id),
+      seed(16, "Sprint Cycles & Iteration Planner (/projects/[id]/cycles)", "done", "high", mockUser.id),
+      seed(17, "Functional Feature Epics & Architecture Modules (/projects/[id]/modules)", "done", "high", mockUser.id),
+      seed(18, "Live Project Scratchpad & Realtime Team Room dock", "done", "medium", mockUser.id),
+      seed(19, "1-Click CSV & JSON Bulk Import and Export on Work Items", "done", "medium", mockUser.id),
+      seed(20, "Git Commit Linking & PR Direct Resolver on Work Items", "done", "medium", mockUser.id),
     ];
   }
 
@@ -90,7 +95,7 @@ export function seedItems(projectId: string): StoredWorkItem[] {
   ];
 }
 
-const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v2";
+const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v3";
 
 // One-time upgrade of a board saved before CW-1..CW-15 were all shipped. Seed items are matched by title: one that
 // exists is marked done, one that is missing is added (keeping its CW number unless a newer item already uses it).

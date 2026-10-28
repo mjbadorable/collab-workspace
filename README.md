@@ -125,6 +125,11 @@ collab-workspace/
 | `CW-13` | Interactive Architecture & Flowchart Node Inspector with Runbook Notes | Done | Medium |
 | `CW-14` | Project Analytics & Velocity Dashboard with pure-SVG charts | Done | Medium |
 | `CW-15` | Dark Mode Theme Switcher: Poké-Center Light vs. Silph Co. Dark | Done | Low |
+| `CW-16` | Sprint Cycles & Iteration Planner (/projects/[id]/cycles) | Done | High |
+| `CW-17` | Functional Feature Epics & Architecture Modules (/projects/[id]/modules) | Done | High |
+| `CW-18` | Live Project Scratchpad & Realtime Team Room dock | Done | Medium |
+| `CW-19` | 1-Click CSV & JSON Bulk Import and Export on Work Items | Done | Medium |
+| `CW-20` | Git Commit Linking & PR Direct Resolver on Work Items | Done | Medium |
 
 ---
 
