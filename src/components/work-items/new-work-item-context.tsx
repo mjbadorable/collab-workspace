@@ -4,7 +4,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useRouter } from "next/navigation";
 import { getProjects, SEED_PROJECT } from "@/lib/projects";
 
-type NewWorkItemContext = { open: boolean; openDialog: () => void; closeDialog: () => void };
+type NewWorkItemContext = {
+  open: boolean;
+  openDialog: () => void;
+  // Opens the dialog with the title field pre-filled (used to tag a work item to an architecture or flowchart node).
+  openDialogWithTitle: (title: string, projectId?: string) => void;
+  presetTitle: string;
+  closeDialog: () => void;
+};
 
 const Ctx = createContext<NewWorkItemContext | null>(null);
 
@@ -26,18 +33,29 @@ function isTyping(target: EventTarget | null): boolean {
 export function NewWorkItemProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [presetTitle, setPresetTitle] = useState("");
 
-  const openDialog = useCallback(() => {
-    // Read the URL at call time (not via usePathname) so this provider needs no Suspense boundary.
-    const { pathname } = window.location;
-    const projectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] ?? getProjects()[0]?.id ?? SEED_PROJECT.id;
-    if (!pathname.startsWith(`/projects/${projectId}/work-items`)) {
-      router.push(`/projects/${projectId}/work-items`);
-    }
-    setOpen(true);
-  }, [router]);
+  const openFor = useCallback(
+    (title: string, forProject?: string) => {
+      // Read the URL at call time (not via usePathname) so this provider needs no Suspense boundary.
+      const { pathname } = window.location;
+      const projectId = forProject ?? pathname.match(/^\/projects\/([^/]+)/)?.[1] ?? getProjects()[0]?.id ?? SEED_PROJECT.id;
+      if (!pathname.startsWith(`/projects/${projectId}/work-items`)) {
+        router.push(`/projects/${projectId}/work-items`);
+      }
+      setPresetTitle(title);
+      setOpen(true);
+    },
+    [router]
+  );
 
-  const closeDialog = useCallback(() => setOpen(false), []);
+  const openDialog = useCallback(() => openFor(""), [openFor]);
+  const openDialogWithTitle = useCallback((title: string, projectId?: string) => openFor(title, projectId), [openFor]);
+
+  const closeDialog = useCallback(() => {
+    setOpen(false);
+    setPresetTitle("");
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -56,6 +74,9 @@ export function NewWorkItemProvider({ children }: { children: ReactNode }) {
     };
   }, [open, openDialog]);
 
-  const value = useMemo(() => ({ open, openDialog, closeDialog }), [open, openDialog, closeDialog]);
+  const value = useMemo(
+    () => ({ open, openDialog, openDialogWithTitle, presetTitle, closeDialog }),
+    [open, openDialog, openDialogWithTitle, presetTitle, closeDialog]
+  );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

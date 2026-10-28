@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Check, Copy, Globe, HeartPulse, Rocket, Workflow } from "lucide-react";
 import { architectureLayers, hostingOf, type ArchitectureLayer } from "@/lib/project-stack";
+import NodeInspector from "./node-inspector";
 import type { ProjectRecord } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
 import { useIsClient } from "@/lib/use-is-client";
@@ -50,15 +51,42 @@ function Chips({ items }: { items: string[] }) {
   );
 }
 
-function LayerCard({ layer }: { layer: ArchitectureLayer }) {
+function LayerCard({ layer, onInspect }: { layer: ArchitectureLayer; onInspect: (layer: ArchitectureLayer) => void }) {
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
       <p className="text-[11px] font-medium uppercase tracking-wide text-red-600">{layer.tag}</p>
       <h3 className="text-sm font-semibold">{layer.title}</h3>
       <p className="mt-0.5 text-xs text-neutral-500">{layer.summary}</p>
       <Chips items={layer.tech} />
+      <button
+        type="button"
+        onClick={() => onInspect(layer)}
+        className="mt-3 text-xs font-medium text-red-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+      >
+        Inspect Layer &amp; Runbook →
+      </button>
     </div>
   );
+}
+
+// Starting point for a layer's runbook; once the user edits it, their version is kept instead.
+function layerRunbook(layer: ArchitectureLayer): string {
+  return [
+    `${layer.title} (${layer.tag})`,
+    layer.summary,
+    "",
+    `Technologies: ${layer.tech.join(", ")}`,
+    `Data flow: ${layer.flow}`,
+    "",
+    "Failure modes & recovery:",
+    "- ",
+    "",
+    "Edge cases to remember:",
+    "- ",
+    "",
+    "Who to ask / where to look first:",
+    "- ",
+  ].join("\n");
 }
 
 function InfraCard({ icon: Icon, title, detail }: { icon: typeof Rocket; title: string; detail: string }) {
@@ -104,7 +132,15 @@ function mermaidSpec(project: ProjectRecord, layers: ArchitectureLayer[]): strin
   ].join("\n");
 }
 
-function Schematic({ project, layers }: { project: ProjectRecord; layers: ArchitectureLayer[] }) {
+function Schematic({
+  project,
+  layers,
+  onInspect,
+}: {
+  project: ProjectRecord;
+  layers: ArchitectureLayer[];
+  onInspect: (layer: ArchitectureLayer) => void;
+}) {
   const host = hostingOf(project.live_url);
   return (
     <div className="space-y-4">
@@ -113,13 +149,13 @@ function Schematic({ project, layers }: { project: ProjectRecord; layers: Archit
           <p className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
             <Globe className="h-3.5 w-3.5" aria-hidden /> Browser · client-side, offline-first boundary
           </p>
-          <LayerCard layer={layers[0]} />
+          <LayerCard layer={layers[0]} onInspect={onInspect} />
           <Wire tags={["[0ms Optimistic]"]} />
-          <LayerCard layer={layers[1]} />
+          <LayerCard layer={layers[1]} onInspect={onInspect} />
           <Wire tags={["[postMessage]"]} />
-          <LayerCard layer={layers[2]} />
+          <LayerCard layer={layers[2]} onInspect={onInspect} />
           <Wire tags={["[IndexedDB Tx]"]} />
-          <LayerCard layer={layers[3]} />
+          <LayerCard layer={layers[3]} onInspect={onInspect} />
           <p className="mt-3 text-xs text-neutral-500">
             Durable writes also flow State → Storage as batched <span className="font-mono">[IndexedDB Tx]</span> (write-behind),
             keeping light metadata separate from heavy binary data.
@@ -190,6 +226,7 @@ export default function ProjectArchitecture({ projectId }: { projectId: string }
   const mounted = useIsClient();
   const { projects } = useProjects();
   const [mode, setMode] = useState<Mode>("visual");
+  const [inspected, setInspected] = useState<ArchitectureLayer | null>(null);
   const project = projects.find((p) => p.id === projectId);
 
   if (!mounted) return <div className="h-full" />;
@@ -229,7 +266,23 @@ export default function ProjectArchitecture({ projectId }: { projectId: string }
         </div>
       </header>
 
-      {mode === "visual" ? <Schematic project={project} layers={layers} /> : <RawSpec spec={mermaidSpec(project, layers)} />}
+      {mode === "visual" ? (
+        <Schematic project={project} layers={layers} onInspect={setInspected} />
+      ) : (
+        <RawSpec spec={mermaidSpec(project, layers)} />
+      )}
+
+      {inspected && (
+        <NodeInspector
+          key={inspected.id}
+          projectId={project.id}
+          nodeId={`layer-${inspected.id}`}
+          nodeTitle={inspected.title}
+          nodeKind={inspected.tag}
+          defaultNotes={layerRunbook(inspected)}
+          onClose={() => setInspected(null)}
+        />
+      )}
 
       <p className="text-xs text-neutral-500">
         Technologies come from the stack in{" "}

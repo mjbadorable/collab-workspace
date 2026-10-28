@@ -1,8 +1,8 @@
 "use client";
 
 import { Suspense, use } from "react";
-import { BarChart3 } from "lucide-react";
-import PlaceholderView from "@/components/placeholder-view";
+import Link from "next/link";
+import ProjectAnalytics from "@/components/projects/project-analytics";
 import { projectIdentifier } from "@/lib/work-items-storage";
 
 type Params = Promise<{ id: string }>;
@@ -11,18 +11,21 @@ type Params = Promise<{ id: string }>;
 function Content({ params }: { params: Params }) {
   const { id } = use(params);
   return (
-    <PlaceholderView
-      title="Dashboards"
-      description="Project analytics and burndown charts."
-      icon={BarChart3}
-      breadcrumbs={[
-        { label: "Projects", href: "/projects" },
-        { label: projectIdentifier(id), href: `/projects/${id}/work-items` },
-        { label: "Dashboards" },
-      ]}
-      backHref={`/projects/${id}/work-items`}
-      backLabel="Back to Work items"
-    />
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-sm text-neutral-500">
+        <Link href="/projects" className="hover:text-neutral-900">
+          Projects
+        </Link>
+        <span aria-hidden>›</span>
+        <Link href={`/projects/${id}`} className="hover:text-neutral-900">
+          {projectIdentifier(id)}
+        </Link>
+        <span aria-hidden>›</span>
+        <span className="text-neutral-900">Dashboards</span>
+      </nav>
+      <h1 className="mb-4 text-xl font-semibold">Dashboards</h1>
+      <ProjectAnalytics projectId={id} />
+    </div>
   );
 }
 

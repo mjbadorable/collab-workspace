@@ -31,7 +31,9 @@ import {
   type FlowStepKind,
 } from "@/lib/diagram-storage";
 import { useProjects } from "@/lib/projects-context";
+import { useTheme } from "@/lib/theme";
 import { useIsClient } from "@/lib/use-is-client";
+import NodeInspector from "@/components/projects/node-inspector";
 
 type StepData = { label: string; index: number; kind: FlowStepKind };
 type StepNode = Node<StepData>;
@@ -153,6 +155,8 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
   const mermaid = useMemo(() => getMermaidForCategory(projectId, category), [projectId, category]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
+  const [inspectedId, setInspectedId] = useState<string | null>(null);
+  const { theme } = useTheme();
 
   const nodes = useMemo<StepNode[]>(
     () =>
@@ -179,10 +183,16 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
     [flow]
   );
 
+  // Clicking a step (card or node) opens its runbook so edge cases can be documented on the flow itself.
+  const inspect = (id: string) => setInspectedId(id);
+
   const select = (id: string) => {
     setSelectedId(id);
     void fitView({ nodes: [{ id }], duration: 300, maxZoom: 1.1, padding: 0.6 });
+    inspect(id);
   };
+
+  const inspectedStep = flow.steps.find((s) => s.id === inspectedId) ?? null;
 
   const meta = flowCategories.find((c) => c.value === category)!;
   const base = `/projects/${projectId}`;
@@ -252,7 +262,11 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
           zoomOnScroll
           fitView
           fitViewOptions={{ padding: 0.2 }}
-          onNodeClick={(_, node) => setSelectedId(node.id)}
+          colorMode={theme}
+          onNodeClick={(_, node) => {
+            setSelectedId(node.id);
+            inspect(node.id);
+          }}
           onPaneClick={() => setSelectedId(null)}
           proOptions={{ hideAttribution: true }}
         >
@@ -270,6 +284,24 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
           ))}
         </ol>
       </section>
+
+      {inspectedStep && (
+        <NodeInspector
+          key={`${category}:${inspectedStep.id}`}
+          projectId={projectId}
+          nodeId={`${category}:${inspectedStep.id}`}
+          nodeTitle={inspectedStep.label}
+          nodeKind={`${meta.label} · ${kindStyle[inspectedStep.kind].tag}`}
+          defaultNotes={[
+            inspectedStep.role,
+            `Data payload: ${inspectedStep.payload}`,
+            "",
+            "Edge cases to document:",
+            "- ",
+          ].join("\n")}
+          onClose={() => setInspectedId(null)}
+        />
+      )}
 
       <MermaidDialog open={showCode} onClose={() => setShowCode(false)} code={mermaid} />
     </div>

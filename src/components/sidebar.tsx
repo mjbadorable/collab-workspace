@@ -18,9 +18,11 @@ import {
   Network,
   LogOut,
   Pencil,
+  Moon,
   Plus,
   Search,
   Settings,
+  Sun,
   Trash2,
   User,
   UserPlus,
@@ -36,6 +38,7 @@ import Avatar from "@/components/settings/avatar";
 import { mockWorkspace } from "@/lib/mock-data";
 import { roleTone, useProfile } from "@/lib/profile-context";
 import { useProjects } from "@/lib/projects-context";
+import { useTheme } from "@/lib/theme";
 import { useWorkspacePermissions } from "@/lib/use-permissions";
 
 const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
@@ -83,6 +86,7 @@ export default function Sidebar({
   const { projects, currentProject, getProjectDiagrams, openCreateDialog } = useProjects();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const { user, loading, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const { workspaces, current, select } = useWorkspaces();
   // The server also rejects non-admin invites; hiding the menu item just avoids a dead end.
   const { isAdmin: canInvite } = useWorkspacePermissions(user && current ? current.id : null);
@@ -348,6 +352,15 @@ export default function Sidebar({
               className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
             >
               <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title="Switch between Poké-Center Light and Silph Co. Dark"
+              aria-label="Switch between Poké-Center Light and Silph Co. Dark"
+              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
             {user ? (
               <button

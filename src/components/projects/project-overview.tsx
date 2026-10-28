@@ -9,6 +9,7 @@ import { progressOf } from "@/components/home/project-card";
 import ProjectAvatar from "@/components/project-avatar";
 import ExportReportDialog from "@/components/projects/export-report-dialog";
 import GithubActivity from "@/components/projects/github-activity";
+import ProjectAnalytics from "@/components/projects/project-analytics";
 import SuggestedImprovements from "@/components/projects/suggested-improvements";
 import { getFlow } from "@/lib/diagram-storage";
 import { splitStack, techRows } from "@/lib/project-stack";
@@ -253,6 +254,8 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
       <GithubActivity githubUrl={project.github_url} liveUrl={project.live_url} />
 
       <FlowchartPipeline key={project.id} projectId={project.id} />
+
+      <ProjectAnalytics projectId={project.id} />
 
       <section aria-label="Project sections" className="grid gap-4 sm:grid-cols-3">
         <SectionCard emoji="📋" title="Work Items" href={`${base}/work-items`} action="Open Kanban Board">

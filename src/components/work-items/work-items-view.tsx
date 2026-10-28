@@ -603,6 +603,7 @@ function ItemForm({
   submitLabel,
   initial,
   defaultStatus,
+  defaultTitle,
   people,
   me,
   onSubmit,
@@ -613,6 +614,7 @@ function ItemForm({
   submitLabel: string;
   initial?: StoredWorkItem;
   defaultStatus?: WorkItemStatus;
+  defaultTitle?: string;
   people: Person[];
   me: Me;
   onSubmit: (input: NewWorkItemInput) => void;
@@ -666,7 +668,7 @@ function ItemForm({
           required
           autoFocus
           maxLength={200}
-          defaultValue={initial?.title}
+          defaultValue={initial?.title ?? defaultTitle}
           className={fieldClass}
         />
       </div>
@@ -840,7 +842,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     setSeenParam(statusParam);
     if (statusParam) setFilter(statusParam);
   }
-  const { open, openDialog, closeDialog } = useNewWorkItem();
+  const { open, openDialog, closeDialog, presetTitle } = useNewWorkItem();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const editDialogRef = useRef<HTMLDialogElement>(null);
   const [editingItem, setEditingItem] = useState<StoredWorkItem | null>(null);
@@ -1083,6 +1085,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             heading="New work item"
             submitLabel="Create work item"
             defaultStatus={presetStatus}
+            defaultTitle={presetTitle}
             people={people}
             me={me}
             onCancel={closeDialog}

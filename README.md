@@ -119,6 +119,12 @@ collab-workspace/
 | `CW-7` | Automated Uptime History Sparkline & Webhook Alerts (Discord/Slack) on health check failure | Done | High |
 | `CW-8` | GitHub PR & Deployment Environment Statuses (Vercel preview links) in Commit Stream | Done | Medium |
 | `CW-9` | Kanban Keyboard Shortcuts, Due Dates, and Sub-task Checklists on Work Items | Done | Medium |
+| `CW-10` | Cross-Project Portfolio Command Center on the Home Dashboard | Done | High |
+| `CW-11` | Inline Kanban Sub-tasks, Color-Coded Type Labels, and Target Due Dates | Done | Medium |
+| `CW-12` | Discord/Slack Webhook Alerts and In-App Activity Feed Bell | Done | High |
+| `CW-13` | Interactive Architecture & Flowchart Node Inspector with Runbook Notes | Done | Medium |
+| `CW-14` | Project Analytics & Velocity Dashboard with pure-SVG charts | Done | Medium |
+| `CW-15` | Dark Mode Theme Switcher: Poké-Center Light vs. Silph Co. Dark | Done | Low |
 
 ---
 

@@ -46,7 +46,8 @@ export function seedItems(projectId: string): StoredWorkItem[] {
     priority,
     assignee_id,
     deleted_at: null,
-    created_at: `2026-10-2${seq}T09:00:00.000Z`,
+    // One day apart from Oct 21, so the CW-n order matches created_at (and the cloud numbering).
+    created_at: `${new Date(Date.UTC(2026, 9, 20 + seq)).toISOString().slice(0, 10)}T09:00:00.000Z`,
   });
 
   if (projectId === "collab-workspace") {
@@ -60,6 +61,12 @@ export function seedItems(projectId: string): StoredWorkItem[] {
       seed(7, "Automated Uptime History Sparkline & Webhook Alerts (Discord/Slack) on health check failure", "done", "high", mockUser.id),
       seed(8, "GitHub PR & Deployment Environment Statuses (Vercel preview links) in Commit Stream", "done", "medium", mockUser.id),
       seed(9, "Kanban Keyboard Shortcuts, Due Dates, and Sub-task Checklists on Work Items", "done", "medium", mockUser.id),
+      seed(10, "Cross-Project Portfolio Command Center on the Home Dashboard", "done", "high", mockUser.id),
+      seed(11, "Inline Kanban Sub-tasks, Color-Coded Type Labels, and Target Due Dates", "done", "medium", mockUser.id),
+      seed(12, "Discord/Slack Webhook Alerts and In-App Activity Feed Bell", "done", "high", mockUser.id),
+      seed(13, "Interactive Architecture & Flowchart Node Inspector with Runbook Notes", "done", "medium", mockUser.id),
+      seed(14, "Project Analytics & Velocity Dashboard with pure-SVG charts", "done", "medium", mockUser.id),
+      seed(15, "Dark Mode Theme Switcher: Poké-Center Light vs. Silph Co. Dark", "done", "low", mockUser.id),
     ];
   }
 
@@ -83,13 +90,22 @@ export function seedItems(projectId: string): StoredWorkItem[] {
   ];
 }
 
-const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v1";
+const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v2";
 
-// One-time upgrade of a board saved before CW-6..CW-9 shipped: adds the missing seed items and marks CW-1..CW-9 done.
+// One-time upgrade of a board saved before CW-1..CW-15 were all shipped. Seed items are matched by title: one that
+// exists is marked done, one that is missing is added (keeping its CW number unless a newer item already uses it).
 function upgradeCollabBoard(items: StoredWorkItem[]): StoredWorkItem[] {
-  const upgraded = items.map((i) => (i.seq <= 9 && i.status !== "done" ? { ...i, status: "done" as const } : i));
-  const missing = seedItems("collab-workspace").filter((s) => !items.some((i) => i.seq === s.seq));
-  return [...upgraded, ...missing].sort((a, b) => a.seq - b.seq);
+  const seeds = seedItems("collab-workspace");
+  const seedTitles = new Set(seeds.map((s) => s.title));
+  const next = items.map((i) =>
+    seedTitles.has(i.title) && !i.deleted_at && i.status !== "done" ? { ...i, status: "done" as const } : i
+  );
+  for (const s of seeds) {
+    if (next.some((i) => i.title === s.title)) continue;
+    const seqTaken = next.some((i) => i.seq === s.seq);
+    next.push({ ...s, seq: seqTaken ? next.reduce((max, i) => Math.max(max, i.seq), 0) + 1 : s.seq });
+  }
+  return next.sort((a, b) => a.seq - b.seq);
 }
 
 export function loadWorkItems(projectId: string): StoredWorkItem[] {

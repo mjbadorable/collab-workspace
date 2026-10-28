@@ -6,6 +6,7 @@ import { CornerDownLeft, Search } from "lucide-react";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import { getProjects } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
+import { useTheme } from "@/lib/theme";
 import { loadWorkItems, workItemKey } from "@/lib/work-items-storage";
 
 type Group = "Quick Actions" | "Projects & Views" | "Work Items";
@@ -48,6 +49,7 @@ function PaletteBody({
   const router = useRouter();
   const { openDialog } = useNewWorkItem();
   const { projects, openCreateDialog } = useProjects();
+  const { toggleTheme } = useTheme();
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
@@ -59,6 +61,7 @@ function PaletteBody({
       { id: "qa-new-project", group: "Quick Actions", label: "Create new project", run: openCreateDialog },
       { id: "qa-profile", group: "Quick Actions", label: "Edit profile", run: onEditProfile },
       { id: "qa-workspace", group: "Quick Actions", label: "New workspace", run: onNewWorkspace },
+      { id: "qa-theme", group: "Quick Actions", label: "Toggle Theme: Poké-Center Light / Silph Co. Dark", run: toggleTheme },
       { id: "qa-home", group: "Quick Actions", label: "Go to Home", run: go("/") },
       { id: "qa-projects", group: "Quick Actions", label: "Go to Projects Hub", run: go("/projects") },
       { id: "qa-settings", group: "Quick Actions", label: "Go to Settings", run: go("/settings") },
@@ -85,7 +88,7 @@ function PaletteBody({
       }
     }
     return list;
-  }, [router, openDialog, openCreateDialog, onEditProfile, onNewWorkspace, projects]);
+  }, [router, openDialog, openCreateDialog, onEditProfile, onNewWorkspace, toggleTheme, projects]);
 
   const results = useMemo(() => {
     const q = query.trim();
