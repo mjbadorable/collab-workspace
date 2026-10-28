@@ -6,7 +6,12 @@ export type SubTask = { text: string; done: boolean };
 export const WORK_ITEM_LABELS = ["Feature", "Bug", "Architecture", "DevOps", "UX"] as const;
 export type WorkItemLabel = (typeof WORK_ITEM_LABELS)[number];
 
+// A progress note on a ticket. The id is its position in the description, so it is only stable until one is deleted.
+export type TicketComment = { id: string; date: string; author: string; text: string };
+
 export type DescriptionMeta = {
+  blockedBy?: string | null; // ticket key such as "CW-3"
+  comments?: TicketComment[];
   label?: WorkItemLabel | null;
   dueDate?: string | null;
   cycle?: string | null;
@@ -21,6 +26,9 @@ const LABEL_LINE = /^\[label:\s*(Feature|Bug|Architecture|DevOps|UX)\]$/;
 const DUE_LINE = /^\[due:\s*(\d{4}-\d{2}-\d{2})\]$/;
 const CYCLE_LINE = /^\[cycle:\s*(.+)\]$/;
 const MODULE_LINE = /^\[module:\s*(.+)\]$/;
+const BLOCKED_LINE = /^\[blocked-by:\s*([A-Za-z0-9]+-\d+)\]$/i;
+const COMMENT_LINE = /^\[comment:\s*([^|]+)\|\s*([^|]+)\|\s*(.+)\]$/;
+const TICKET_KEY = /^[A-Za-z0-9]+-\d+$/;
 const COMPLETED_LINE = /^\[completed:\s*(\d{4}-\d{2}-\d{2})\]$/;
 const COMMIT_LINE = /^\[commit:\s*([a-f0-9]{7,40})\]$/i;
 const PR_LINE = /^\[pr:\s*#?(\d+)\]$/i;
@@ -59,6 +67,8 @@ export function parseDescription(description: string | null): {
   commit: string | null;
   pr: string | null;
   completedDate: string | null;
+  blockedBy: string | null;
+  comments: TicketComment[];
 } {
   const tasks: SubTask[] = [];
   const notes: string[] = [];
@@ -69,6 +79,8 @@ export function parseDescription(description: string | null): {
   let commit: string | null = null;
   let pr: string | null = null;
   let completedDate: string | null = null;
+  let blockedBy: string | null = null;
+  const comments: TicketComment[] = [];
   for (const line of (description ?? "").split(/\r?\n/)) {
     const trimmed = line.trim();
     const task = line.match(TASK_LINE);
@@ -79,6 +91,8 @@ export function parseDescription(description: string | null): {
     const commitMatch = trimmed.match(COMMIT_LINE);
     const prMatch = trimmed.match(PR_LINE);
     const completedMatch = trimmed.match(COMPLETED_LINE);
+    const blockedMatch = trimmed.match(BLOCKED_LINE);
+    const commentMatch = trimmed.match(COMMENT_LINE);
     if (task) tasks.push({ text: task[2], done: task[1] !== " " });
     else if (labelMatch && isLabel(labelMatch[1])) label = labelMatch[1];
     else if (dueMatch) dueDate = dueMatch[1];
@@ -87,9 +101,33 @@ export function parseDescription(description: string | null): {
     else if (commitMatch) commit = commitMatch[1].toLowerCase();
     else if (prMatch) pr = prMatch[1];
     else if (completedMatch) completedDate = completedMatch[1];
-    else notes.push(line);
+    else if (blockedMatch) blockedBy = blockedMatch[1].toUpperCase();
+    else if (commentMatch) {
+      comments.push({ id: String(comments.length), author: commentMatch[1].trim(), date: commentMatch[2].trim(), text: commentMatch[3].trim() });
+    } else notes.push(line);
   }
-  return { notes: notes.join("\n").trim(), tasks, label, dueDate, cycle, module: moduleName, commit, pr, completedDate };
+  return { notes: notes.join("\n").trim(), tasks, label, dueDate, cycle, module: moduleName, commit, pr, completedDate, blockedBy, comments };
+}
+
+// One comment per line: "|" separates the three fields and line breaks would split the comment, so they are removed.
+const oneLine = (text: string) => text.replace(/[\r\n]+/g, " ").trim();
+const commentLine = (c: TicketComment) =>
+  `[comment: ${oneLine(c.author).replace(/[|[\]]/g, "") || "Unknown"} | ${oneLine(c.date).replace(/\|/g, "")} | ${oneLine(c.text)}]`;
+
+// Every piece of metadata a parsed description carries, ready to hand back to serializeDescription unchanged.
+// Use it whenever a description is edited so no tag is dropped by accident.
+export function metaFromParsed(p: ReturnType<typeof parseDescription>): DescriptionMeta {
+  return {
+    label: p.label,
+    dueDate: p.dueDate,
+    cycle: p.cycle,
+    module: p.module,
+    commit: p.commit,
+    pr: p.pr,
+    completedDate: p.completedDate,
+    blockedBy: p.blockedBy,
+    comments: p.comments,
+  };
 }
 
 // The inverse of parseDescription; null when there is nothing to store.
@@ -103,6 +141,8 @@ export function serializeDescription(notes: string, tasks: SubTask[], meta: Desc
     meta.commit && COMMIT_PATTERN.test(meta.commit) ? `[commit: ${meta.commit.toLowerCase()}]` : "",
     meta.pr && PR_PATTERN.test(meta.pr) ? `[pr: ${meta.pr.replace("#", "")}]` : "",
     meta.completedDate && /^\d{4}-\d{2}-\d{2}$/.test(meta.completedDate) ? `[completed: ${meta.completedDate}]` : "",
+    meta.blockedBy && TICKET_KEY.test(meta.blockedBy) ? `[blocked-by: ${meta.blockedBy.toUpperCase()}]` : "",
+    ...(meta.comments ?? []).map(commentLine),
   ].filter(Boolean);
   const text = [notes.trim(), lines.join("\n"), metaLines.join("\n")].filter(Boolean).join("\n\n");
   return text || null;
@@ -116,15 +156,7 @@ export function localDateIso(date = new Date()): string {
 // Sets (or, with null, clears) the [completed: date] stamp and keeps everything else in the description.
 export function withCompletedDate(description: string | null, date: string | null): string | null {
   const p = parseDescription(description);
-  return serializeDescription(p.notes, p.tasks, {
-    label: p.label,
-    dueDate: p.dueDate,
-    cycle: p.cycle,
-    module: p.module,
-    commit: p.commit,
-    pr: p.pr,
-    completedDate: date,
-  });
+  return serializeDescription(p.notes, p.tasks, { ...metaFromParsed(p), completedDate: date });
 }
 
 export function taskProgress(tasks: SubTask[]): { done: number; total: number; percent: number } {

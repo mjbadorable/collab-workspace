@@ -22,12 +22,13 @@ import { useAuth } from "@/lib/auth-context";
 import {
   dueBadge,
   labelTone,
+  metaFromParsed,
   parseDescription,
   serializeDescription,
   taskProgress,
   WORK_ITEM_LABELS,
   type SubTask,
-  type WorkItemLabel,
+  type TicketComment,
 } from "@/lib/checklist";
 import { getCycles } from "@/lib/cycles";
 import { initials, mockUser } from "@/lib/mock-data";
@@ -122,6 +123,11 @@ type Me = { id: string; name: string };
 type Person = { id: string; name: string; avatar_url: string | null };
 
 const nameFromEmail = (email: string) => email.split("@")[0].replace(/[._-]+/g, " ");
+
+const formatCommentDate = (date: string) => {
+  const d = new Date(date);
+  return Number.isNaN(d.getTime()) ? date : d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+};
 
 // A work item may carry a cycle or module that no longer exists; keep it selectable so saving does not drop it.
 const withCurrent = (names: string[], current: string | null) => (current && !names.includes(current) ? [...names, current] : names);
@@ -246,29 +252,48 @@ function GitBadge({ href, icon: Icon, children, title }: { href: string | null; 
   );
 }
 
+type Parsed = ReturnType<typeof parseDescription>;
+
+// True when a card or row has any badge to show besides the sub-task pill.
+const hasMeta = (p: Parsed) =>
+  Boolean(p.label || p.dueDate || p.cycle || p.module || p.commit || p.pr || p.blockedBy || p.comments.length > 0);
+
+// `blockerStatus` is the status of the ticket named in [blocked-by], or null when that ticket is not on the board.
 function ItemMeta({
-  label,
-  dueDate,
-  cycle,
-  module,
-  commit,
-  pr,
+  parsed,
   githubUrl,
   status,
+  blockerStatus,
 }: {
-  label: WorkItemLabel | null;
-  dueDate: string | null;
-  cycle: string | null;
-  module: string | null;
-  commit: string | null;
-  pr: string | null;
+  parsed: Parsed;
   githubUrl: string;
   status: WorkItemStatus;
+  blockerStatus: WorkItemStatus | null;
 }) {
+  const { label, dueDate, cycle, module, commit, pr, blockedBy, comments } = parsed;
   const due = dueBadge(dueDate, status);
-  if (!label && !due && !cycle && !module && !commit && !pr) return null;
+  if (!hasMeta(parsed)) return null;
   return (
     <>
+      {blockedBy &&
+        (blockerStatus === null ? (
+          <span title={`${blockedBy} is not on this board`} className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600">
+            Blocked by {blockedBy} (not found)
+          </span>
+        ) : blockerStatus === "done" ? (
+          <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            ✓ Unblocked ({blockedBy})
+          </span>
+        ) : (
+          <span className="shrink-0 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+            ⛔ Blocked by {blockedBy}
+          </span>
+        ))}
+      {comments.length > 0 && (
+        <span title={`${comments.length} ${comments.length === 1 ? "comment" : "comments"}`} className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600">
+          💬 {comments.length}
+        </span>
+      )}
       {commit && (
         <GitBadge href={repoLink(githubUrl, `commit/${commit}`)} icon={GitCommit} title={`Commit ${commit}`}>
           #{commit.slice(0, 7)}
@@ -362,6 +387,7 @@ function WorkItemRow({
   me,
   people,
   githubUrl,
+  statusByKey,
   remote,
   onChange,
   onEdit,
@@ -373,6 +399,7 @@ function WorkItemRow({
   me: Me;
   people: Person[];
   githubUrl: string;
+  statusByKey: ReadonlyMap<string, WorkItemStatus>;
   remote: boolean;
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
@@ -383,6 +410,7 @@ function WorkItemRow({
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
   const parsed = parseDescription(item.description);
   const { notes, tasks } = parsed;
+  const blockerStatus = parsed.blockedBy ? (statusByKey.get(parsed.blockedBy) ?? null) : null;
 
   return (
     <li
@@ -405,16 +433,7 @@ function WorkItemRow({
         {notes && <p className="truncate text-xs text-neutral-500">{notes}</p>}
       </button>
       <SubtaskPill tasks={tasks} />
-      <ItemMeta
-        label={parsed.label}
-        dueDate={parsed.dueDate}
-        cycle={parsed.cycle}
-        module={parsed.module}
-        commit={parsed.commit}
-        pr={parsed.pr}
-        githubUrl={githubUrl}
-        status={item.status}
-      />
+      <ItemMeta parsed={parsed} githubUrl={githubUrl} status={item.status} blockerStatus={blockerStatus} />
       <PillSelect
         label={`Status of ${key}`}
         value={item.status}
@@ -482,6 +501,7 @@ function BoardCard({
   me,
   people,
   githubUrl,
+  statusByKey,
   remote,
   onChange,
   onEdit,
@@ -493,6 +513,7 @@ function BoardCard({
   me: Me;
   people: Person[];
   githubUrl: string;
+  statusByKey: ReadonlyMap<string, WorkItemStatus>;
   remote: boolean;
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
@@ -503,22 +524,13 @@ function BoardCard({
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
   const parsed = parseDescription(item.description);
   const { notes, tasks } = parsed;
+  const blockerStatus = parsed.blockedBy ? (statusByKey.get(parsed.blockedBy) ?? null) : null;
   const [showTasks, setShowTasks] = useState(false);
 
   // Checking a sub-task rewrites the description in place, keeping the notes, label and due date.
   const toggleTask = (index: number) => {
     const next = tasks.map((t, i) => (i === index ? { ...t, done: !t.done } : t));
-    onChange({
-      description: serializeDescription(notes, next, {
-        label: parsed.label,
-        dueDate: parsed.dueDate,
-        cycle: parsed.cycle,
-        module: parsed.module,
-        commit: parsed.commit,
-        pr: parsed.pr,
-        completedDate: parsed.completedDate,
-      }),
-    });
+    onChange({ description: serializeDescription(notes, next, metaFromParsed(parsed)) });
   };
 
   return (
@@ -572,19 +584,10 @@ function BoardCard({
         </p>
         {notes && <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{notes}</p>}
       </button>
-      {(tasks.length > 0 || parsed.label || parsed.dueDate || parsed.cycle || parsed.module || parsed.commit || parsed.pr) && (
+      {(tasks.length > 0 || hasMeta(parsed)) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <SubtaskPill tasks={tasks} expanded={showTasks} onToggle={() => setShowTasks((v) => !v)} />
-          <ItemMeta
-            label={parsed.label}
-            dueDate={parsed.dueDate}
-            cycle={parsed.cycle}
-            module={parsed.module}
-            commit={parsed.commit}
-            pr={parsed.pr}
-            githubUrl={githubUrl}
-            status={item.status}
-          />
+          <ItemMeta parsed={parsed} githubUrl={githubUrl} status={item.status} blockerStatus={blockerStatus} />
         </div>
       )}
       {showTasks && tasks.length > 0 && (
@@ -637,6 +640,7 @@ function KanbanBoard({
   me,
   people,
   githubUrl,
+  statusByKey,
   remoteUpdatedIds,
   onChange,
   onEdit,
@@ -650,6 +654,7 @@ function KanbanBoard({
   me: Me;
   people: Person[];
   githubUrl: string;
+  statusByKey: ReadonlyMap<string, WorkItemStatus>;
   remoteUpdatedIds: ReadonlySet<string>;
   onChange: (id: string, patch: Partial<StoredWorkItem>) => void;
   onEdit: (item: StoredWorkItem) => void;
@@ -718,6 +723,7 @@ function KanbanBoard({
                   me={me}
                   people={people}
                   githubUrl={githubUrl}
+                  statusByKey={statusByKey}
                   remote={remoteUpdatedIds.has(item.id)}
                   onChange={(patch) => onChange(item.id, patch)}
                   onEdit={() => onEdit(item)}
@@ -755,6 +761,8 @@ function ItemForm({
   me,
   cycleNames,
   moduleNames,
+  blockers,
+  author,
   onSubmit,
   onCancel,
 }: {
@@ -768,12 +776,30 @@ function ItemForm({
   me: Me;
   cycleNames: string[];
   moduleNames: string[];
+  blockers: { id: string; key: string; title: string }[];
+  author: string; // who comments are written as
   onSubmit: (input: NewWorkItemInput) => void;
   onCancel: () => void;
 }) {
   const initialParts = parseDescription(initial?.description ?? null);
   const [tasks, setTasks] = useState<SubTask[]>(initialParts.tasks);
   const [draft, setDraft] = useState("");
+  const [comments, setComments] = useState<TicketComment[]>(initialParts.comments);
+  const [commentDraft, setCommentDraft] = useState("");
+
+  const newComment = (text: string): TicketComment => ({
+    id: crypto.randomUUID(),
+    author,
+    date: new Date().toISOString().slice(0, 16),
+    text,
+  });
+
+  const addComment = () => {
+    const text = commentDraft.trim();
+    if (!text) return;
+    setComments((prev) => [...prev, newComment(text)]);
+    setCommentDraft("");
+  };
 
   const addTask = () => {
     const text = draft.trim();
@@ -802,6 +828,9 @@ function ItemForm({
           pr: String(f.get("pr") ?? "").trim() || null,
           // Kept as is here; the status change itself stamps or clears it when the item is saved.
           completedDate: initialParts.completedDate,
+          blockedBy: String(f.get("blocked") ?? "") || null,
+          // A comment typed but not yet added still counts.
+          comments: commentDraft.trim() ? [...comments, newComment(commentDraft.trim())] : comments,
         }) ?? "",
       status: f.get("status") as WorkItemStatus,
       priority: f.get("priority") as WorkItemPriority,
@@ -923,6 +952,25 @@ function ItemForm({
           />
         </div>
       </div>
+      <div>
+        <label htmlFor="wi-blocked" className="mb-1 block text-xs font-medium text-neutral-600">
+          Blocked By
+        </label>
+        <select id="wi-blocked" name="blocked" defaultValue={initialParts.blockedBy ?? ""} className={fieldClass}>
+          <option value="">None</option>
+          {blockers
+            .filter((b) => b.id !== initial?.id)
+            .map((b) => (
+              <option key={b.id} value={b.key}>
+                {b.key} — {b.title}
+              </option>
+            ))}
+          {/* A blocker that is no longer on the board stays selectable so saving does not drop it. */}
+          {initialParts.blockedBy && !blockers.some((b) => b.key === initialParts.blockedBy) && (
+            <option value={initialParts.blockedBy}>{initialParts.blockedBy} (not on this board)</option>
+          )}
+        </select>
+      </div>
       <fieldset>
         <legend className="mb-1 block text-xs font-medium text-neutral-600">
           Sub-tasks / Checklist{tasks.length > 0 && ` (${taskProgress(tasks).done}/${tasks.length})`}
@@ -975,6 +1023,58 @@ function ItemForm({
           </button>
         </div>
       </fieldset>
+      {initial && (
+        <fieldset>
+          <legend className="mb-1 block text-xs font-medium text-neutral-600">
+            Comments &amp; Progress Log{comments.length > 0 && ` (${comments.length})`}
+          </legend>
+          {comments.length > 0 && (
+            <ul className="mb-2 space-y-2">
+              {comments.map((c) => (
+                <li key={c.id} className="rounded-md bg-neutral-50 px-3 py-2 text-sm">
+                  <div className="flex items-center gap-2 text-xs text-neutral-500">
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-medium text-neutral-700">{c.author}</span> · {formatCommentDate(c.date)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setComments((prev) => prev.filter((p) => p.id !== c.id))}
+                      aria-label={`Delete comment by ${c.author}`}
+                      className="rounded p-0.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <p className="mt-0.5 whitespace-pre-wrap break-words text-neutral-800">{c.text}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-2">
+            <input
+              value={commentDraft}
+              onChange={(e) => setCommentDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault(); // Enter adds the comment instead of submitting the form
+                  addComment();
+                }
+              }}
+              aria-label="New comment"
+              placeholder="Write a progress note…"
+              maxLength={500}
+              className={fieldClass}
+            />
+            <button
+              type="button"
+              onClick={addComment}
+              className="shrink-0 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+            >
+              Add Comment
+            </button>
+          </div>
+        </fieldset>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="wi-status" className="mb-1 block text-xs font-medium text-neutral-600">
@@ -1140,6 +1240,10 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     startFocusTimer(workItemKey(projectId, item.seq), item.title);
   };
 
+  // Every ticket on the board by key, for "blocked by" badges and the Blocked By choices.
+  const boardTickets = items.filter((i) => !i.deleted_at).map((i) => ({ id: i.id, key: workItemKey(projectId, i.seq), title: i.title, status: i.status }));
+  const statusByKey = new Map(boardTickets.map((t) => [t.key, t.status] as const));
+
   const needle = query.trim().toLowerCase();
   const live = items
     .filter((i) => !i.deleted_at)
@@ -1268,6 +1372,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             me={me}
             people={people}
             githubUrl={githubUrl}
+            statusByKey={statusByKey}
             remoteUpdatedIds={remoteUpdatedIds}
             onChange={update}
             onEdit={setEditingItem}
@@ -1300,6 +1405,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
                 me={me}
                 people={people}
                 githubUrl={githubUrl}
+                statusByKey={statusByKey}
                 remote={remoteUpdatedIds.has(item.id)}
                 onChange={(patch) => update(item.id, patch)}
                 onEdit={() => setEditingItem(item)}
@@ -1343,6 +1449,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             me={me}
             cycleNames={cycleNames}
             moduleNames={moduleNames}
+            blockers={boardTickets}
+            author={displayName}
             onCancel={closeDialog}
             onSubmit={(input) => {
               add(input);
@@ -1371,6 +1479,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             me={me}
             cycleNames={cycleNames}
             moduleNames={moduleNames}
+            blockers={boardTickets}
+            author={displayName}
             onCancel={() => setEditingItem(null)}
             onSubmit={(input) => {
               update(editingItem.id, {

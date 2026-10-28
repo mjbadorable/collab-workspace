@@ -2,8 +2,16 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Check, Copy, Globe, HeartPulse, Rocket, Workflow } from "lucide-react";
-import { architectureLayers, hostingOf, type ArchitectureLayer } from "@/lib/project-stack";
+import { ArrowDown, ArrowUp, Check, Copy, Globe, HeartPulse, Pencil, Rocket, Workflow } from "lucide-react";
+import {
+  architectureLayers,
+  hasCustomArchitectureLayers,
+  hostingOf,
+  resetCustomArchitectureLayers,
+  saveCustomArchitectureLayers,
+  type ArchitectureLayer,
+} from "@/lib/project-stack";
+import ArchitectureLayersDialog from "./architecture-layers-dialog";
 import NodeInspector from "./node-inspector";
 import type { ProjectRecord } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
@@ -227,6 +235,9 @@ export default function ProjectArchitecture({ projectId }: { projectId: string }
   const { projects } = useProjects();
   const [mode, setMode] = useState<Mode>("visual");
   const [inspected, setInspected] = useState<ArchitectureLayer | null>(null);
+  const [editingLayers, setEditingLayers] = useState(false);
+  // Bumped after the layers are edited so this render reads them again (the schematic and the Mermaid spec follow).
+  const [, setVersion] = useState(0);
   const project = projects.find((p) => p.id === projectId);
 
   if (!mounted) return <div className="h-full" />;
@@ -250,19 +261,28 @@ export default function ProjectArchitecture({ projectId }: { projectId: string }
             </p>
           </div>
         </div>
-        <div role="tablist" aria-label="Architecture view" className="flex rounded-md bg-neutral-100 p-0.5">
-          {modes.map((m) => (
-            <button
-              key={m.value}
-              role="tab"
-              type="button"
-              aria-selected={mode === m.value}
-              onClick={() => setMode(m.value)}
-              className={`rounded px-3 py-1.5 text-sm ${mode === m.value ? "bg-white font-medium shadow-sm" : "text-neutral-600 hover:text-neutral-900"}`}
-            >
-              {m.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setEditingLayers(true)}
+            className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+          >
+            <Pencil className="h-4 w-4" aria-hidden /> Edit Layers
+          </button>
+          <div role="tablist" aria-label="Architecture view" className="flex rounded-md bg-neutral-100 p-0.5">
+            {modes.map((m) => (
+              <button
+                key={m.value}
+                role="tab"
+                type="button"
+                aria-selected={mode === m.value}
+                onClick={() => setMode(m.value)}
+                className={`rounded px-3 py-1.5 text-sm ${mode === m.value ? "bg-white font-medium shadow-sm" : "text-neutral-600 hover:text-neutral-900"}`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -271,6 +291,21 @@ export default function ProjectArchitecture({ projectId }: { projectId: string }
       ) : (
         <RawSpec spec={mermaidSpec(project, layers)} />
       )}
+
+      <ArchitectureLayersDialog
+        open={editingLayers}
+        onClose={() => setEditingLayers(false)}
+        layers={layers}
+        isCustom={hasCustomArchitectureLayers(project.id)}
+        onSave={(next) => {
+          saveCustomArchitectureLayers(project.id, next);
+          setVersion((v) => v + 1);
+        }}
+        onReset={() => {
+          resetCustomArchitectureLayers(project.id);
+          setVersion((v) => v + 1);
+        }}
+      />
 
       {inspected && (
         <NodeInspector

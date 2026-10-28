@@ -66,8 +66,64 @@ export type ArchitectureLayer = {
 const STATE_PATTERN = /zustand|redux|jotai|pinia|react query|tanstack|context|swr|dexie-react-hooks/i;
 const WORKER_PATTERN = /worker|pdf\.?js|wasm|webassembly|fflate|sheetjs|engine|ffmpeg/i;
 
-// Describes the four decoupled layers from whatever stack the project declares.
+// ---- custom layers: a project's edited layers replace the derived ones
+
+const customLayersKey = (projectId: string) => `collab-workspace:custom-architecture:${projectId}`;
+const LAYER_IDS = ["ui", "state", "engine", "storage"];
+
+const isLayer = (v: unknown): v is ArchitectureLayer => {
+  if (typeof v !== "object" || v === null) return false;
+  const l = v as ArchitectureLayer;
+  return (
+    typeof l.id === "string" &&
+    typeof l.title === "string" &&
+    typeof l.tag === "string" &&
+    typeof l.summary === "string" &&
+    typeof l.flow === "string" &&
+    Array.isArray(l.tech) &&
+    l.tech.every((t) => typeof t === "string")
+  );
+};
+
+function readCustomLayers(projectId: string): ArchitectureLayer[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(customLayersKey(projectId));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    // Exactly the four known layers, in order; anything else means the saved data is not usable.
+    if (Array.isArray(parsed) && parsed.length === 4 && parsed.every(isLayer) && parsed.every((l, i) => l.id === LAYER_IDS[i])) return parsed;
+  } catch {
+    // corrupt JSON or storage blocked: use the derived layers
+  }
+  return null;
+}
+
+export const hasCustomArchitectureLayers = (projectId: string) => readCustomLayers(projectId) !== null;
+
+export function saveCustomArchitectureLayers(projectId: string, layers: ArchitectureLayer[]): void {
+  try {
+    localStorage.setItem(customLayersKey(projectId), JSON.stringify(layers));
+  } catch {
+    // storage blocked: the edit lasts until the page is reloaded
+  }
+}
+
+export function resetCustomArchitectureLayers(projectId: string): void {
+  try {
+    localStorage.removeItem(customLayersKey(projectId));
+  } catch {
+    // nothing stored to remove
+  }
+}
+
+// The four decoupled layers: the project's saved edits if it has any (in the browser), else derived from its stack.
 export function architectureLayers(project: ProjectRecord): ArchitectureLayer[] {
+  return readCustomLayers(project.id) ?? deriveLayers(project);
+}
+
+// Describes the four decoupled layers from whatever stack the project declares.
+function deriveLayers(project: ProjectRecord): ArchitectureLayer[] {
   const front = splitStack(project.frontend_stack);
   const back = splitStack(project.backend_stack);
   const all = [...front, ...back];

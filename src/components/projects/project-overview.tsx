@@ -10,6 +10,7 @@ import ProjectAvatar from "@/components/project-avatar";
 import ExportReportDialog from "@/components/projects/export-report-dialog";
 import GithubActivity from "@/components/projects/github-activity";
 import ProjectAnalytics from "@/components/projects/project-analytics";
+import ReleasesPanel from "@/components/projects/releases-panel";
 import SuggestedImprovements from "@/components/projects/suggested-improvements";
 import { getFlow } from "@/lib/diagram-storage";
 import { splitStack, techRows } from "@/lib/project-stack";
@@ -256,6 +257,8 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
       <FlowchartPipeline key={project.id} projectId={project.id} />
 
       <ProjectAnalytics projectId={project.id} />
+
+      <ReleasesPanel project={project} />
 
       <section aria-label="Project sections" className="grid gap-4 sm:grid-cols-3">
         <SectionCard emoji="📋" title="Work Items" href={`${base}/work-items`} action="Open Kanban Board">
