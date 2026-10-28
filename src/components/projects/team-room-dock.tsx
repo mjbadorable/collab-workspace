@@ -151,6 +151,16 @@ export default function TeamRoomDock({ projectId }: { projectId: string }) {
   const { online, connected } = pad;
   const live = workspaceId !== null && connected;
 
+  // Esc closes the panel, unless a dialog is open (Esc belongs to that dialog then).
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape" && !document.querySelector("dialog[open]")) setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
   return (
     <div className="no-print fixed bottom-4 right-4 z-30">
       {open ? (

@@ -136,6 +136,12 @@ collab-workspace/
 | `CW-24` | Kanto Gym Badge Case & Engineering XP gamification system | Done | Low |
 | `CW-25` | 1-Click Full Workspace Snapshot Backup and Restore (.json) | Done | Medium |
 | `CW-26` | Pomodoro Focus Timer dock linked to active Kanban work items | Done | Medium |
+| `CW-27` | Interactive System Architecture Layer Editor (/projects/[id]/architecture) | Done | Medium |
+| `CW-28` | Release Changelog & Semantic Version Tag Generator with Markdown export | Done | Medium |
+| `CW-29` | Ticket Blocker Dependencies (⛔ Blocked by) and in-ticket comment logs | Done | Medium |
+| `CW-30` | Pokédex Dossier 5-axis technical radar and fleet technology matrix | Done | Medium |
+| `CW-31` | Daily Standup & Executive Digest Generator on Home Dashboard | Done | Medium |
+| `CW-32` | Global Keyboard Shortcut Cheat-sheet (?) and milestone celebration burst | Done | Low |
 
 ---
 

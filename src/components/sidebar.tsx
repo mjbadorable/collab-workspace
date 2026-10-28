@@ -14,6 +14,7 @@ import {
   Cog,
   Database,
   Home,
+  Keyboard,
   Landmark,
   Layers,
   ListTodo,
@@ -76,12 +77,14 @@ export default function Sidebar({
   onInvite,
   onEditProfile,
   onSearch,
+  onShortcuts,
 }: {
   onNavigate?: () => void;
   onNewWorkspace: () => void;
   onInvite: () => void;
   onEditProfile: () => void;
   onSearch: () => void;
+  onShortcuts: () => void;
 }) {
   const pathname = usePathname();
   const activeCategory = useSearchParams().get("category") ?? "user";
@@ -358,6 +361,18 @@ export default function Sidebar({
               className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
             >
               <Pencil className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigate?.();
+                onShortcuts();
+              }}
+              title="Keyboard shortcuts (?)"
+              aria-label="Keyboard shortcuts"
+              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+            >
+              <Keyboard className="h-4 w-4" />
             </button>
             <button
               type="button"

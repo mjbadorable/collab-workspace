@@ -26,6 +26,7 @@ import {
 import HealthPill from "./health-pill";
 import LiveWorkItems from "./live-work-items";
 import ProjectCard from "./project-card";
+import StandupDialog from "./standup-dialog";
 
 const launchpad = (projectId: string) => [
   {
@@ -240,6 +241,7 @@ export default function HomeDashboard() {
   const target = useStorageTarget();
   const workspaceId = target.mode === "cloud" ? target.workspaceId : null;
   const [selectedId, setSelectedId] = useState("all");
+  const [standupOpen, setStandupOpen] = useState(false);
   const picked = projects.find((p) => p.id === selectedId);
   // "all" (the default) is the portfolio view; it is also the fallback if the picked project was deleted.
   const portfolio = !picked;
@@ -251,6 +253,13 @@ export default function HomeDashboard() {
       <Greeting name={displayName} />
       <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-neutral-500">Here&apos;s what&apos;s on your plate in {workspaceName}.</p>
+        <button
+          type="button"
+          onClick={() => setStandupOpen(true)}
+          className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+        >
+          📋 Daily Standup Digest
+        </button>
         {projects.length > 1 && (
           <label className="flex items-center gap-2 text-sm text-neutral-600">
             Project
@@ -322,6 +331,8 @@ export default function HomeDashboard() {
           </div>
         </>
       )}
+
+      <StandupDialog open={standupOpen} onClose={() => setStandupOpen(false)} />
     </div>
   );
 }

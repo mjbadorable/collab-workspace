@@ -8,6 +8,8 @@ import { ProfileProvider } from "@/lib/profile-context";
 import { ProjectsProvider } from "@/lib/projects-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import CommandPalette from "./command-palette";
+import { ConfettiCanvas } from "./confetti-burst";
+import ShortcutsDialog from "./shortcuts-dialog";
 import FocusTimerDock from "./focus-timer-dock";
 import TeamRoomDock from "./projects/team-room-dock";
 import EditProfileDialog from "./settings/edit-profile-dialog";
@@ -42,6 +44,7 @@ function Chrome({ children }: { children: ReactNode }) {
   const [inviteRequested, setInviteRequested] = useState(false);
   const [profileRequested, setProfileRequested] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const pathname = usePathname();
   // The Team Room belongs to the project whose pages are open.
   const projectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] ?? null;
@@ -60,6 +63,7 @@ function Chrome({ children }: { children: ReactNode }) {
             onInvite={() => setInviteRequested(true)}
             onEditProfile={() => setProfileRequested(true)}
             onSearch={() => setPaletteOpen(true)}
+            onShortcuts={() => setShortcutsOpen(true)}
           />
         </Suspense>
       </aside>
@@ -86,6 +90,10 @@ function Chrome({ children }: { children: ReactNode }) {
                 onSearch={() => {
                   setMobileOpen(false);
                   setPaletteOpen(true);
+                }}
+                onShortcuts={() => {
+                  setMobileOpen(false);
+                  setShortcutsOpen(true);
                 }}
               />
             </Suspense>
@@ -118,6 +126,8 @@ function Chrome({ children }: { children: ReactNode }) {
     </div>
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
     <FocusTimerDock />
+    <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+    <ConfettiCanvas />
     <InviteDialog open={inviteRequested} onClose={() => setInviteRequested(false)} />
     <EditProfileDialog open={profileRequested} onClose={() => setProfileRequested(false)} />
     {projectId && <TeamRoomDock key={projectId} projectId={projectId} />}

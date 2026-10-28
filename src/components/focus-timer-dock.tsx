@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Coffee, Pause, Play, RotateCcw } from "lucide-react";
 import { useFocusTimer } from "@/lib/focus-timer";
 
@@ -10,6 +10,17 @@ const format = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart
 export default function FocusTimerDock() {
   const { state, secondsLeft, pauseTimer, resumeTimer, resetTimer, skipToBreak } = useFocusTimer();
   const [collapsed, setCollapsed] = useState(false);
+  const active = state !== null;
+
+  // Esc tucks the bar away (it never stops the timer), unless a dialog is open and needs the key.
+  useEffect(() => {
+    if (!active || collapsed) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.querySelector("dialog[open]")) setCollapsed(true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [active, collapsed]);
 
   if (!state) return null;
 

@@ -5,6 +5,7 @@ import type { WorkItem } from "./database.types";
 import { ensureCloudProject } from "./cloud-projects";
 import {
   addWorkItem,
+  canonicalSeedTitle,
   fetchCloudWorkItems,
   insertCloudWorkItem,
   loadWorkItems,
@@ -72,7 +73,7 @@ async function upgradeCollabCloudProject(
   isCancelled: () => boolean
 ): Promise<StoredWorkItem[]> {
   if (projectId !== "collab-workspace") return current;
-  const guard = `collab-workspace:cloud-nextgen-v4:${projectUuid}`;
+  const guard = `collab-workspace:cloud-nextgen-v6:${projectUuid}`;
   try {
     if (localStorage.getItem(guard)) return current;
     localStorage.setItem(guard, "1");
@@ -80,10 +81,12 @@ async function upgradeCollabCloudProject(
     return current;
   }
   const seeds = seedItems("collab-workspace");
+  const seedTitles = new Set(seeds.map((s) => s.title));
   let changed = false;
   for (const s of seeds) {
     if (isCancelled()) return current;
-    const match = current.find((r) => !r.deleted_at && r.title === s.title);
+    // An item carrying an older wording of this seed's title counts as the same item.
+    const match = current.find((r) => !r.deleted_at && canonicalSeedTitle(r.title, seedTitles) === s.title);
     if (!match) {
       await insertCloudWorkItem(projectUuid, {
         title: s.title,
@@ -92,8 +95,8 @@ async function upgradeCollabCloudProject(
         priority: s.priority,
       });
       changed = true;
-    } else if (match.status !== "done") {
-      await updateCloudWorkItem(match.id, { status: "done" });
+    } else if (match.status !== "done" || match.title !== s.title) {
+      await updateCloudWorkItem(match.id, { status: "done", title: s.title });
       changed = true;
     }
   }

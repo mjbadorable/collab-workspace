@@ -19,6 +19,7 @@ import { useProjects } from "@/lib/projects-context";
 import { useIsClient } from "@/lib/use-is-client";
 import { workItemKey, type StoredWorkItem, type WorkItemStatus } from "@/lib/work-items-storage";
 import { ProjectNotFound } from "./project-overview";
+import { fireConfetti } from "@/components/confetti-burst";
 import WorkItemsSource from "./work-items-source";
 
 type Api = Parameters<Parameters<typeof WorkItemsSource>[0]["children"]>[0];
@@ -386,7 +387,10 @@ function Planner({ projectId, api }: { projectId: string; api: Api }) {
               cycle={c}
               items={itemsOf(c)}
               onStatus={(id, status) => api.update(id, { status })}
-              onCycleStatus={(status) => setCycles(updateCycle(projectId, c.id, { status }))}
+              onCycleStatus={(status) => {
+                setCycles(updateCycle(projectId, c.id, { status }));
+                if (status === "completed") fireConfetti();
+              }}
             />
           ))}
         </div>

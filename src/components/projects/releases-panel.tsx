@@ -7,6 +7,7 @@ import { downloadFile } from "@/lib/project-report";
 import type { ProjectRecord } from "@/lib/projects";
 import { localDateIso } from "@/lib/checklist";
 import { workItemKey, type StoredWorkItem } from "@/lib/work-items-storage";
+import { fireConfetti } from "@/components/confetti-burst";
 import WorkItemsSource from "./work-items-source";
 
 const fieldClass =
@@ -209,7 +210,10 @@ function Releases({ project, items }: { project: ProjectRecord; items: StoredWor
             project={project}
             releases={releases}
             items={items}
-            onCreate={(input) => setReleases(createRelease(project.id, input))}
+            onCreate={(input) => {
+              setReleases(createRelease(project.id, input));
+              fireConfetti();
+            }}
             onClose={() => setCutting(false)}
           />
         )}

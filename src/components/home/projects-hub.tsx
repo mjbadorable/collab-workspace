@@ -9,6 +9,7 @@ import type { ProjectRecord } from "@/lib/projects";
 import LiveWorkItems from "./live-work-items";
 import { progressOf } from "./project-card";
 import HealthPill from "./health-pill";
+import { Dossier, DossierSelector, FleetTechMatrix } from "./pokedex-dossier";
 
 type Tab = "all" | "joined";
 
@@ -98,11 +99,16 @@ export default function ProjectsHub() {
   const { projects, openCreateDialog, syncError } = useProjects();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>("all");
+  const [view, setView] = useState<"cards" | "dossier">("cards");
+  const [dossierId, setDossierId] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
 
   // There is no per-project membership yet: every project you can see is one you've joined.
   const joined = projects;
   const shown = (tab === "all" ? projects : joined).filter((p) => !q || `${p.name} ${p.identifier}`.toLowerCase().includes(q));
+
+  // The dossier shows the picked project, or the first one in view if that one is filtered out or deleted.
+  const dossierProject = shown.find((p) => p.id === dossierId) ?? shown[0];
 
   const tabs: { value: Tab; label: string; count: number }[] = [
     { value: "all", label: "All projects", count: projects.length },
@@ -127,6 +133,24 @@ export default function ProjectsHub() {
               className="w-56 rounded-md border border-neutral-300 bg-white py-1.5 pl-8 pr-2.5 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
             />
           </label>
+          <div role="group" aria-label="View" className="flex rounded-md bg-neutral-100 p-0.5 text-sm">
+            {(
+              [
+                ["cards", "Standard Cards"],
+                ["dossier", "Pokédex Dossier"],
+              ] as const
+            ).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={view === value}
+                onClick={() => setView(value)}
+                className={`rounded px-2.5 py-1 ${view === value ? "bg-white font-medium shadow-sm" : "text-neutral-600 hover:text-neutral-900"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             onClick={openCreateDialog}
@@ -166,6 +190,14 @@ export default function ProjectsHub() {
         <p className="mt-6 py-16 text-center text-sm text-neutral-500">
           {projects.length === 0 ? "No projects yet. Create your first one." : "No projects match your search."}
         </p>
+      ) : view === "dossier" ? (
+        <>
+          <div className="mt-6 grid gap-4 md:grid-cols-[16rem_1fr]">
+            <DossierSelector projects={shown} selectedId={dossierProject.id} onSelect={setDossierId} />
+            <Dossier key={dossierProject.id} project={dossierProject} />
+          </div>
+          <FleetTechMatrix projects={shown} />
+        </>
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((p) => (

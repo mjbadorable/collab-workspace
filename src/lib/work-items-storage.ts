@@ -78,6 +78,12 @@ export function seedItems(projectId: string): StoredWorkItem[] {
       seed(24, "Kanto Gym Badge Case & Engineering XP gamification system", "done", "low", mockUser.id),
       seed(25, "1-Click Full Workspace Snapshot Backup and Restore (.json)", "done", "medium", mockUser.id),
       seed(26, "Pomodoro Focus Timer dock linked to active Kanban work items", "done", "medium", mockUser.id),
+      seed(27, "Interactive System Architecture Layer Editor (/projects/[id]/architecture)", "done", "medium", mockUser.id),
+      seed(28, "Release Changelog & Semantic Version Tag Generator with Markdown export", "done", "medium", mockUser.id),
+      seed(29, "Ticket Blocker Dependencies (⛔ Blocked by) and in-ticket comment logs", "done", "medium", mockUser.id),
+      seed(30, "Pokédex Dossier 5-axis technical radar and fleet technology matrix", "done", "medium", mockUser.id),
+      seed(31, "Daily Standup & Executive Digest Generator on Home Dashboard", "done", "medium", mockUser.id),
+      seed(32, "Global Keyboard Shortcut Cheat-sheet (?) and milestone celebration burst", "done", "low", mockUser.id),
     ];
   }
 
@@ -101,16 +107,32 @@ export function seedItems(projectId: string): StoredWorkItem[] {
   ];
 }
 
-const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v4";
+const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v6";
 
-// One-time upgrade of a board saved before CW-1..CW-15 were all shipped. Seed items are matched by title: one that
-// exists is marked done, one that is missing is added (keeping its CW number unless a newer item already uses it).
+// Earlier wordings of seed titles, so a board that already holds the old title is not given a duplicate.
+export const SEED_TITLE_ALIASES: Record<string, string[]> = {
+  "Interactive System Architecture Layer Editor (/projects/[id]/architecture)": ["Interactive System Architecture Layer Editor"],
+  "Release Changelog & Semantic Version Tag Generator with Markdown export": ["Release Changelog & Semantic Version Tag Generator"],
+  "Ticket Blocker Dependencies (⛔ Blocked by) and in-ticket comment logs": ["Ticket Blocker Dependencies and In-Ticket Comment Thread"],
+};
+
+// The seed title an item's title stands for (itself, or the current wording of an older one), else null.
+export function canonicalSeedTitle(title: string, seedTitles: Set<string>): string | null {
+  if (seedTitles.has(title)) return title;
+  return Object.entries(SEED_TITLE_ALIASES).find(([, old]) => old.includes(title))?.[0] ?? null;
+}
+
+// One-time upgrade of a board saved before CW-1..CW-32 were all shipped. Seed items are matched by title: one that
+// exists is marked done (and renamed if it has an older wording), one that is missing is added (keeping its CW
+// number unless a newer item already uses it).
 function upgradeCollabBoard(items: StoredWorkItem[]): StoredWorkItem[] {
   const seeds = seedItems("collab-workspace");
   const seedTitles = new Set(seeds.map((s) => s.title));
-  const next = items.map((i) =>
-    seedTitles.has(i.title) && !i.deleted_at && i.status !== "done" ? { ...i, status: "done" as const } : i
-  );
+  const next = items.map((i) => {
+    const canonical = canonicalSeedTitle(i.title, seedTitles);
+    if (!canonical || i.deleted_at) return i;
+    return { ...i, title: canonical, status: "done" as const };
+  });
   for (const s of seeds) {
     if (next.some((i) => i.title === s.title)) continue;
     const seqTaken = next.some((i) => i.seq === s.seq);
