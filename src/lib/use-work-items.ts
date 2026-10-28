@@ -8,6 +8,7 @@ import {
   loadWorkItems,
   mergeWorkItemRow,
   saveWorkItems,
+  seedItems,
   subscribeLocalWorkItems,
   subscribeWorkItems,
   unsubscribeWorkItems,
@@ -30,6 +31,36 @@ const sameContent = (a: StoredWorkItem, b: WorkItem) =>
   a.priority === b.priority &&
   a.assignee_id === b.assignee_id &&
   a.deleted_at === b.deleted_at;
+
+// A cloud project with no work items gets the project's built-in seed items, once per project (guarded in
+// localStorage so deleting them later does not bring them back). Returns the rows to show.
+async function seedEmptyCloudProject(
+  projectUuid: string,
+  projectId: string,
+  current: StoredWorkItem[],
+  isCancelled: () => boolean
+): Promise<StoredWorkItem[]> {
+  const seeds = seedItems(projectId);
+  if (seeds.length === 0) return current;
+  const guard = `collab-workspace:cloud-seeded:${projectUuid}`;
+  try {
+    if (localStorage.getItem(guard)) return current;
+    localStorage.setItem(guard, "1");
+  } catch {
+    return current; // without storage the guard cannot hold, so do not risk seeding on every visit
+  }
+  // In order, so created_at (and therefore the CW-1.. numbering) follows the seed order. Seed assignees are mock ids.
+  for (const s of seeds) {
+    if (isCancelled()) return current;
+    await insertCloudWorkItem(projectUuid, {
+      title: s.title,
+      description: s.description ?? "",
+      status: s.status,
+      priority: s.priority,
+    });
+  }
+  return fetchCloudWorkItems(projectUuid);
+}
 
 // One project's work items. With a workspaceId they live in Supabase (and stay live via Realtime, with presence);
 // without one they live in localStorage and sync across tabs. The source is fixed for the hook's lifetime, so
@@ -143,7 +174,8 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
             if (!cancelled) setActiveUsers(viewers);
           },
         });
-        const rows = await fetchCloudWorkItems(pid);
+        let rows = await fetchCloudWorkItems(pid);
+        if (rows.length === 0) rows = await seedEmptyCloudProject(pid, projectId, rows, () => cancelled);
         if (!cancelled) setItems(rows);
       } catch (e) {
         if (!cancelled) {

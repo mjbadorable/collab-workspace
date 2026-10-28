@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ExternalLink, FolderKanban, GitFork, Plus, Search, Users } from "lucide-react";
+import ProjectAvatar from "@/components/project-avatar";
 import { useProjects } from "@/lib/projects-context";
 import type { ProjectRecord } from "@/lib/projects";
 import LiveWorkItems from "./live-work-items";
@@ -19,9 +20,7 @@ function HubCard({ project }: { project: ProjectRecord }) {
         return (
           <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="flex items-start gap-3">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-red-500 to-amber-400 text-xl font-semibold text-white">
-                {project.icon ?? project.name[0]?.toUpperCase()}
-              </span>
+              <ProjectAvatar project={project} />
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-sm font-semibold">{project.name}</h3>
                 <span className="mt-1 inline-block rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-xs text-neutral-600">

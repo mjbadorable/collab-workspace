@@ -2,27 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Circle, Diamond, ExternalLink, FileDown, GitFork, Square, type LucideIcon } from "lucide-react";
+import { ArrowRight, Check, Circle, Diamond, ExternalLink, FileDown, GitFork, Square, type LucideIcon } from "lucide-react";
 import HealthPill from "@/components/home/health-pill";
 import LiveWorkItems from "@/components/home/live-work-items";
 import { progressOf } from "@/components/home/project-card";
+import ProjectAvatar from "@/components/project-avatar";
 import ExportReportDialog from "@/components/projects/export-report-dialog";
 import GithubActivity from "@/components/projects/github-activity";
+import SuggestedImprovements from "@/components/projects/suggested-improvements";
 import { getFlow } from "@/lib/diagram-storage";
-import { techRows } from "@/lib/project-stack";
-import { getProjectDiagrams, type ProjectRecord } from "@/lib/projects";
+import { splitStack, techRows } from "@/lib/project-stack";
+import { getProjectDiagrams, slugify } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
 import { useIsClient } from "@/lib/use-is-client";
 
-export function ProjectAvatar({ project, className = "h-12 w-12 text-xl" }: { project: ProjectRecord; className?: string }) {
-  return (
-    <span
-      className={`flex shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-red-500 to-amber-400 font-semibold text-white ${className}`}
-    >
-      {project.icon ?? project.name[0]?.toUpperCase()}
-    </span>
-  );
-}
+// Kept as a named export for the pages that already import it from here.
+export { ProjectAvatar };
+
+const NOT_SPECIFIED = "Not specified yet";
 
 export function ProjectNotFound() {
   return (
@@ -121,7 +118,8 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
   const mounted = useIsClient();
   const { projects } = useProjects();
   const [exporting, setExporting] = useState(false);
-  const project = projects.find((p) => p.id === projectId);
+  // The slug fallback keeps an old bookmark (e.g. /projects/collab-workspace-devops-portal) from 404ing.
+  const project = projects.find((p) => p.id === projectId) ?? projects.find((p) => slugify(p.name) === projectId);
 
   if (!mounted) return <div className="h-full" />;
   if (!project) return <ProjectNotFound />;
@@ -129,11 +127,11 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
   const base = `/projects/${project.id}`;
   const diagrams = getProjectDiagrams(project.id);
   const linkClass =
-    "flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-sm text-neutral-700 hover:bg-neutral-100";
+    "flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700";
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-6 py-8">
-      <header className="flex flex-wrap items-start gap-4">
+      <header className="flex flex-wrap items-start gap-4 rounded-xl border border-neutral-200 bg-linear-to-br from-white via-white to-red-50/40 p-6 shadow-xs">
         <ProjectAvatar project={project} className="h-14 w-14 text-2xl" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -142,19 +140,27 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
               {project.identifier}
             </span>
           </div>
-          {project.live_url ? (
-            <div className="mt-2">
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 font-medium text-neutral-600">
+              {project.is_public ? "Public" : "Private"}
+            </span>
+            {project.lead && (
+              <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700">
+                Lead: {project.lead}
+              </span>
+            )}
+            {project.live_url ? (
               <HealthPill url={project.live_url} />
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-neutral-500">
-              No live URL yet. Add one in{" "}
-              <Link href={`${base}/settings`} className="text-red-600 hover:underline">
-                settings
-              </Link>{" "}
-              to monitor production.
-            </p>
-          )}
+            ) : (
+              <span className="text-neutral-500">
+                No live URL yet. Add one in{" "}
+                <Link href={`${base}/settings`} className="text-red-600 hover:underline">
+                  settings
+                </Link>{" "}
+                to monitor production.
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {project.github_url && (
@@ -174,7 +180,7 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
       </header>
 
       <section aria-labelledby="ov-about" className="grid gap-6 md:grid-cols-2">
-        <div>
+        <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-xs">
           <h2 id="ov-about" className="text-sm font-semibold text-neutral-700">
             What it is
           </h2>
@@ -182,12 +188,17 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
             {project.description || "No description yet. Add one in project settings."}
           </p>
         </div>
-        <div>
+        <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-xs">
           <h2 className="text-sm font-semibold text-neutral-700">Core functions</h2>
           {project.functions.length > 0 ? (
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-neutral-600 marker:text-red-500">
+            <ul className="mt-3 space-y-2 text-sm text-neutral-600">
               {project.functions.map((f) => (
-                <li key={f}>{f}</li>
+                <li key={f} className="flex items-start gap-2">
+                  <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+                    <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden />
+                  </span>
+                  {f}
+                </li>
               ))}
             </ul>
           ) : (
@@ -215,7 +226,22 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
                   <th scope="row" className="whitespace-nowrap px-4 py-3 font-medium">
                     {row.layer}
                   </th>
-                  <td className="px-4 py-3 text-neutral-700">{row.tech}</td>
+                  <td className="px-4 py-3 text-neutral-700">
+                    {row.tech === NOT_SPECIFIED ? (
+                      row.tech
+                    ) : (
+                      <span className="flex flex-wrap gap-1.5">
+                        {splitStack(row.tech).map((tech) => (
+                          <span
+                            key={tech}
+                            className="inline-flex items-center rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs font-medium text-neutral-700"
+                          >
+                            {tech}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-neutral-500">{row.role}</td>
                 </tr>
               ))}
@@ -268,6 +294,8 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
           <p className="mt-1 text-neutral-500">{diagrams.map((d) => d.name).join(", ")}</p>
         </SectionCard>
       </section>
+
+      {project.id === "collab-workspace" && <SuggestedImprovements projectId={project.id} />}
 
       <ExportReportDialog project={project} open={exporting} onClose={() => setExporting(false)} />
     </div>

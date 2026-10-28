@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { GitFork, Loader2, Sparkles } from "lucide-react";
+import PokeballIcon from "@/components/pokeball-icon";
 import { useAuth } from "@/lib/auth-context";
 import { ensureCloudProject } from "@/lib/cloud-projects";
 import { normalizeIdentifier, suggestIdentifier } from "@/lib/identifier";
@@ -13,7 +14,7 @@ import { addWorkItem, insertCloudWorkItem, saveWorkItems, type NewWorkItemInput,
 const fieldClass =
   "w-full rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500";
 
-const iconChoices = ["🙂", "🚀", "📚", "🛠️", "🎮", "📊", "🧪", "🌐"];
+const iconChoices = ["pokeball", "🙂", "🚀", "📚", "🛠️", "🎮", "📊", "🧪", "🌐"];
 
 type Draft = { title: string; priority: NewWorkItemInput["priority"] };
 
@@ -211,7 +212,7 @@ function CreateForm({ onClose }: { onClose: () => void }) {
             aria-expanded={pickingIcon}
             className="flex h-10 w-10 items-center justify-center rounded-md border border-neutral-300 bg-neutral-50 text-lg hover:bg-neutral-100"
           >
-            {icon ?? (name.trim()[0]?.toUpperCase() || "🙂")}
+            {icon === "pokeball" ? <PokeballIcon className="h-5 w-5" /> : (icon ?? (name.trim()[0]?.toUpperCase() || "🙂"))}
           </button>
           {pickingIcon && (
             <div className="absolute left-0 top-full z-10 mt-1 grid w-40 grid-cols-4 gap-1 rounded-md border border-neutral-200 bg-white p-1.5 shadow-lg">
@@ -225,7 +226,8 @@ function CreateForm({ onClose }: { onClose: () => void }) {
                   }}
                   className="rounded p-1 text-lg hover:bg-neutral-100"
                 >
-                  {choice}
+                  {choice === "pokeball" ? <PokeballIcon className="mx-auto h-5 w-5" /> : choice}
+                  {choice === "pokeball" && <span className="sr-only">Pokéball</span>}
                 </button>
               ))}
             </div>

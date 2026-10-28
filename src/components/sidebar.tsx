@@ -29,6 +29,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import PokeballIcon from "@/components/pokeball-icon";
+import ProjectAvatar from "@/components/project-avatar";
 import Avatar from "@/components/settings/avatar";
 import { mockWorkspace } from "@/lib/mock-data";
 import { roleTone, useProfile } from "@/lib/profile-context";
@@ -226,9 +227,7 @@ export default function Sidebar({
                     className={`${itemClass(false)} w-full`}
                   >
                     <Chevron className="h-4 w-4 shrink-0 text-neutral-400" />
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-linear-to-br from-red-500 to-amber-400 text-[11px] font-semibold text-white">
-                      {project.icon ?? project.name[0]?.toUpperCase()}
-                    </span>
+                    <ProjectAvatar project={project} className="h-5 w-5 text-[11px]" />
                     <span className="truncate">{project.name}</span>
                   </button>
                   {expanded && (

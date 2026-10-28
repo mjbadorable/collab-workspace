@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { BarChart3, ExternalLink, GitFork, Landmark, Network, Pencil, RefreshCw, SquareCheckBig, Users } from "lucide-react";
+import ProjectAvatar, { isPokeballProject } from "@/components/project-avatar";
 import type { ProjectRecord } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
 import type { StoredWorkItem } from "@/lib/work-items-storage";
@@ -147,9 +148,13 @@ export default function ProjectCard({ project, items }: { project: ProjectRecord
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-linear-to-br from-red-500 to-amber-400 font-mono text-xs font-semibold text-white">
-          {project.identifier}
-        </span>
+        {isPokeballProject(project) ? (
+          <ProjectAvatar project={project} className="h-10 w-10" />
+        ) : (
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-linear-to-br from-red-500 to-amber-400 font-mono text-xs font-semibold text-white">
+            {project.identifier}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-semibold">{project.name}</h3>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">

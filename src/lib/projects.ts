@@ -81,7 +81,7 @@ export const COLLAB_WORKSPACE_PROJECT: ProjectRecord = {
   identifier: "CW",
   description:
     "Collaborative engineering control plane and monitoring dashboard with real-time health checks, plug-and-play GitHub breakdowns, and categorized process flows.",
-  icon: "⚡",
+  icon: "pokeball",
   is_public: true,
   github_url: "https://github.com/mjbadorable/collab-workspace",
   live_url: "https://collab-workspace-mu.vercel.app",
@@ -102,7 +102,7 @@ export const COLLAB_WORKSPACE_PROJECT: ProjectRecord = {
 export const SEED_PROJECTS: ProjectRecord[] = [SEED_PROJECT, GRADE_ASSISTANT_PROJECT, COLLAB_WORKSPACE_PROJECT];
 
 const KEY = "collab-workspace:projects";
-const SEEDED_FLAG = "collab-workspace:projects-seeded-v2";
+const SEEDED_FLAG = "collab-workspace:projects-seeded-v3";
 const listeners = new Set<() => void>();
 
 // useSyncExternalStore needs a referentially stable snapshot, so the parsed list is cached per raw string.
@@ -125,7 +125,7 @@ export function getProjects(): ProjectRecord[] {
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) cachedList = (parsed as Partial<ProjectRecord>[]).map(normalize);
+      if (Array.isArray(parsed)) cachedList = dedupeByIdentifier((parsed as Partial<ProjectRecord>[]).map(normalize));
     } catch {
       // corrupt JSON: fall back to the seed
     }
@@ -133,18 +133,44 @@ export function getProjects(): ProjectRecord[] {
   return cachedList;
 }
 
-// Records saved before the stack fields existed get empty values, or the seed's for the seeded projects.
+const filled = (value: string | null | undefined) => (value?.trim() ? value : undefined);
+
+// A seeded project (matched by id or identifier) is always complete: its canonical id is forced and any blank
+// field takes the seed's value, so a bare record from an older version or from Supabase repairs itself.
+// Other records only get empty values for fields that did not exist when they were saved.
 function normalize(p: Partial<ProjectRecord>): ProjectRecord {
-  const seed = SEED_PROJECTS.find((s) => s.id === p.id);
+  const seed = SEED_PROJECTS.find((s) => s.id === p.id || s.identifier === p.identifier);
+  if (!seed) {
+    return {
+      ...(p as ProjectRecord),
+      functions: Array.isArray(p.functions) ? p.functions : [],
+      frontend_stack: p.frontend_stack ?? "",
+      backend_stack: p.backend_stack ?? "",
+    };
+  }
   return {
+    ...seed,
     ...(p as ProjectRecord),
-    functions: Array.isArray(p.functions) ? p.functions : (seed?.functions ?? []),
-    frontend_stack: p.frontend_stack ?? seed?.frontend_stack ?? "",
-    backend_stack: p.backend_stack ?? seed?.backend_stack ?? "",
+    id: seed.id,
+    description: filled(p.description) ?? seed.description,
+    icon: seed.id === "collab-workspace" && (!p.icon || p.icon === "⚡") ? "pokeball" : p.icon || seed.icon,
+    github_url: filled(p.github_url) ?? seed.github_url,
+    live_url: filled(p.live_url) ?? seed.live_url,
+    functions: Array.isArray(p.functions) && p.functions.length > 0 ? p.functions : seed.functions,
+    frontend_stack: filled(p.frontend_stack) ?? seed.frontend_stack,
+    backend_stack: filled(p.backend_stack) ?? seed.backend_stack,
+    lead: p.lead ?? seed.lead,
   };
 }
 
-// One-time: adds the seeded projects an older saved registry doesn't have (e.g. the Grade Assistant).
+// Identifiers are unique, so a second record with the same one is a stale duplicate (e.g. the old CW slug).
+function dedupeByIdentifier(list: ProjectRecord[]): ProjectRecord[] {
+  const seen = new Set<string>();
+  return list.filter((p) => !seen.has(p.identifier) && !!seen.add(p.identifier));
+}
+
+// Once per version: adds the seeded projects an older saved registry doesn't have (e.g. the Grade Assistant)
+// and saves the repaired registry so the fixes persist.
 export function ensureSeedProjects() {
   try {
     if (localStorage.getItem(SEEDED_FLAG)) return;
@@ -155,7 +181,7 @@ export function ensureSeedProjects() {
   if (readRaw() === null) return;
   const list = getProjects();
   const missing = SEED_PROJECTS.filter((s) => !list.some((p) => p.identifier === s.identifier));
-  if (missing.length > 0) write([...list, ...missing]);
+  write([...list, ...missing]);
 }
 
 export function subscribeProjects(callback: () => void): () => void {
@@ -219,39 +245,56 @@ export function deleteLocalProject(id: string) {
   write(getProjects().filter((p) => p.id !== id));
 }
 
-// Adds cloud projects this device has not seen. Matching is by identifier, which is unique per workspace.
+// Merges cloud projects into the local registry. Matching is by identifier, which is unique per workspace.
+// Known projects only gain what they lack (a bare cloud row never blanks richer local data); unknown ones are added,
+// seeded identifiers under their canonical id instead of a slug of the cloud name.
 export function mergeRemoteProjects(rows: Project[]) {
   const list = getProjects();
-  const known = new Set(list.map((p) => p.identifier));
-  const added = rows.filter((r) => !known.has(r.identifier));
-  if (added.length === 0) return;
   const next = [...list];
-  for (const r of added) {
-    const base = slugify(r.name);
+  for (const r of rows) {
+    const index = next.findIndex((p) => p.identifier === r.identifier);
+    if (index >= 0) {
+      const local = next[index];
+      next[index] = {
+        ...local,
+        description: filled(local.description) ?? r.description ?? "",
+        icon: local.icon || r.icon,
+        github_url: filled(local.github_url) ?? r.github_url ?? "",
+        live_url: filled(local.live_url) ?? r.live_url ?? "",
+        functions: local.functions.length > 0 ? local.functions : (r.functions ?? []),
+        frontend_stack: filled(local.frontend_stack) ?? r.frontend_stack ?? "",
+        backend_stack: filled(local.backend_stack) ?? r.backend_stack ?? "",
+      };
+      continue;
+    }
+    const seed = SEED_PROJECTS.find((s) => s.identifier === r.identifier);
+    const base = seed?.id ?? slugify(r.name);
     let id = base;
     for (let n = 2; next.some((p) => p.id === id); n++) id = `${base}-${n}`;
-    next.push({
-      id,
-      name: r.name,
-      identifier: r.identifier,
-      description: r.description ?? "",
-      icon: r.icon,
-      is_public: r.is_public ?? true,
-      github_url: r.github_url ?? "",
-      live_url: r.live_url ?? "",
-      functions: r.functions ?? [],
-      frontend_stack: r.frontend_stack ?? "",
-      backend_stack: r.backend_stack ?? "",
-      lead: null,
-      created_at: r.created_at,
-    });
+    next.push(
+      normalize({
+        id,
+        name: r.name,
+        identifier: r.identifier,
+        description: r.description ?? "",
+        icon: r.icon,
+        is_public: r.is_public ?? true,
+        github_url: r.github_url ?? "",
+        live_url: r.live_url ?? "",
+        functions: r.functions ?? [],
+        frontend_stack: r.frontend_stack ?? "",
+        backend_stack: r.backend_stack ?? "",
+        lead: null,
+        created_at: r.created_at,
+      })
+    );
   }
-  write(next);
+  if (JSON.stringify(next) !== JSON.stringify(list)) write(next);
 }
 
 // ---------------------------------------------------------------- cloud mirror
 
-const columns = (p: ProjectRecord) => ({
+export const projectColumns = (p: ProjectRecord) => ({
   name: p.name,
   description: p.description || null,
   icon: p.icon,
@@ -285,8 +328,8 @@ export async function pushCloudProject(workspaceId: string, project: ProjectReco
     .maybeSingle();
   if (lookupError) throw new Error(lookupError.message);
   const { error } = existing
-    ? await db.from("projects").update({ ...columns(project), deleted_at: null }).eq("id", existing.id)
-    : await db.from("projects").insert({ workspace_id: workspaceId, identifier: project.identifier, ...columns(project) });
+    ? await db.from("projects").update({ ...projectColumns(project), deleted_at: null }).eq("id", existing.id)
+    : await db.from("projects").insert({ workspace_id: workspaceId, identifier: project.identifier, ...projectColumns(project) });
   if (error) throw new Error(error.message);
 }
 

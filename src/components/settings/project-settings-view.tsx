@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BookOpen, Bug, CheckSquare, Plus, Sparkles, TrendingUp, type LucideIcon } from "lucide-react";
 import LiveWorkItems from "@/components/home/live-work-items";
+import ProjectAvatar from "@/components/project-avatar";
 import { priorityOptions, statusOptions } from "@/components/work-items/work-items-view";
 import { useAuth } from "@/lib/auth-context";
 import { fetchMembers, type Member } from "@/lib/members";
@@ -351,9 +352,7 @@ export default function ProjectSettingsView({ projectId }: { projectId: string }
         <Link href="/projects" className="hover:text-neutral-900">Projects</Link>
         <span aria-hidden>›</span>
         <Link href={`/projects/${project.id}/work-items`} className="flex items-center gap-1.5 hover:text-neutral-900">
-          <span className="flex h-5 w-5 items-center justify-center rounded bg-linear-to-br from-red-500 to-amber-400 text-[11px] font-semibold text-white">
-            {project.icon ?? project.name[0]?.toUpperCase()}
-          </span>
+          <ProjectAvatar project={project} className="h-5 w-5 text-[11px]" />
           {project.name}
         </Link>
         <span aria-hidden>›</span>

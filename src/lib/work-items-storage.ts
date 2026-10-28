@@ -29,7 +29,7 @@ export function workItemKey(projectId: string, seq: number): string {
   return `${projectIdentifier(projectId)}-${seq}`;
 }
 
-function seedItems(projectId: string): StoredWorkItem[] {
+export function seedItems(projectId: string): StoredWorkItem[] {
   const seed = (
     seq: number,
     title: string,
@@ -56,6 +56,10 @@ function seedItems(projectId: string): StoredWorkItem[] {
       seed(3, "Workspace-level member role permissions (Admin vs Member granular gates)", "done", "medium", mockUser.id),
       seed(4, "Export project telemetry and architecture blueprint as printable PDF report", "done", "low", mockUser.id),
       seed(5, "Plug & Play GitHub repo breakdown and auto-task generation", "done", "high", mockUser.id),
+      seed(6, "Command Palette (Ctrl+K / Cmd+K) for instant project, ticket, and diagram navigation", "in_progress", "high", mockUser.id),
+      seed(7, "Automated Uptime History Sparkline & Webhook Alerts (Discord/Slack) on health check failure", "backlog", "high", null),
+      seed(8, "GitHub PR & Deployment Environment Statuses (Vercel preview links) in Commit Stream", "backlog", "medium", null),
+      seed(9, "Kanban Keyboard Shortcuts, Due Dates, and Sub-task Checklists on Work Items", "backlog", "medium", null),
     ];
   }
 
