@@ -97,8 +97,8 @@ export function seedItems(projectId: string): StoredWorkItem[] {
 
   if (projectId === "mastersoft-grade-encoding-assistant") {
     return [
-      seed(1, "Per-Class Undo / Redo change history and rollback stack (TC-029)", "in_progress", "high", mockUser.id),
-      seed(2, "Cross-class overview and readiness dashboard across sections (TC-032)", "backlog", "high", mockUser.id),
+      seed(1, "Per-Class Undo / Redo change history and rollback stack (TC-029)", "done", "high", mockUser.id),
+      seed(2, "Cross-class overview and readiness dashboard across sections (TC-032)", "in_progress", "high", mockUser.id),
       seed(3, "74.5–74.9 passing boundary warning badge and verification check (TC-009)", "backlog", "medium", mockUser.id),
       seed(4, "Custom CO point splits in column outcome builder (OBE engine)", "backlog", "medium", null),
       seed(5, "Offline PWA service worker with IndexedDB sync", "done", "high", mockUser.id),
