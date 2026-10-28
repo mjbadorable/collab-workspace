@@ -39,9 +39,9 @@ function seedModules(projectId: string): ProjectModule[] {
   }
   if (projectId === "mastersoft-grade-encoding-assistant") {
     return [
-      mod("seed-mgea-calc", "Computation & Transmutation", "Grade formulas, rounding and the transmutation table.", "🧮", ["MGEA-1", "MGEA-3"]),
-      mod("seed-mgea-pwa", "Offline PWA Cache", "Service worker and IndexedDB sync.", "⚡", ["MGEA-2"]),
-      mod("seed-mgea-xls", "Excel Template Parser", "Class record import and Mastersoft templates.", "📊", ["MGEA-4", "MGEA-5"]),
+      mod("seed-mgea-calc", "Computation & Transmutation", "Grade formulas, rounding, step table and change history.", "🧮", ["MGEA-1", "MGEA-3", "MGEA-6"]),
+      mod("seed-mgea-pwa", "Offline PWA & Readiness", "Service worker, IndexedDB sync and all-classes overview.", "⚡", ["MGEA-2", "MGEA-5"]),
+      mod("seed-mgea-xls", "Excel & OBE Exporters", "Class record import, Mastersoft templates and VPAA sheets.", "📊", ["MGEA-4", "MGEA-7", "MGEA-8"]),
     ];
   }
   return [];

@@ -41,7 +41,8 @@ function seedCycles(projectId: string): Cycle[] {
   if (projectId === "mastersoft-grade-encoding-assistant") {
     return [
       cycle("seed-mgea-1", "Cycle 1: Grading Formula Engine & Double-Rounding", "Core computation and rounding rules.", "2026-10-10", "2026-10-20", "completed"),
-      cycle("seed-mgea-2", "Cycle 2: Excel Parser & Encoding Guide Generator", "Import class records, export the guide.", "2026-10-20", "2026-11-03", "active"),
+      cycle("seed-mgea-2", "Cycle 2: Excel Parser, OBE Engine & VPAA Exporter", "Import class records, OBE attainment and VPAA workbook.", "2026-10-20", "2026-10-27", "completed"),
+      cycle("seed-mgea-3", "Cycle 3: High-Priority Hardening (Undo, Overview, TC-009)", "Change history undo/redo, all-classes readiness dashboard and edge-case guards.", "2026-10-28", "2026-11-10", "active"),
     ];
   }
   return [];
