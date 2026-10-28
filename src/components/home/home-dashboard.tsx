@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock, Inbox, Landmark, ListTodo, Network, Plus } from "lucide-react";
 import Greeting from "@/components/greeting";
 import ProjectAvatar from "@/components/project-avatar";
+import GymBadgeCase from "./gym-badge-case";
 import { priorityOptions, statusOptions } from "@/components/work-items/work-items-view";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import { ensureCloudProject } from "@/lib/cloud-projects";
@@ -169,7 +170,11 @@ function Portfolio({ projects, workspaceId }: { projects: ProjectRecord[]; works
 
   return (
     <>
-      <h2 className="mt-6 text-sm font-semibold text-neutral-700">Live fleet status</h2>
+      <div className="mt-6">
+        <GymBadgeCase />
+      </div>
+
+      <h2 className="mt-8 text-sm font-semibold text-neutral-700">Live fleet status</h2>
       <ul className="mt-3 grid gap-3 sm:grid-cols-3">
         {projects.map((p) => (
           <li key={p.id} className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">

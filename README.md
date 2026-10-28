@@ -130,6 +130,12 @@ collab-workspace/
 | `CW-18` | Live Project Scratchpad & Realtime Team Room dock | Done | Medium |
 | `CW-19` | 1-Click CSV & JSON Bulk Import and Export on Work Items | Done | Medium |
 | `CW-20` | Git Commit Linking & PR Direct Resolver on Work Items | Done | Medium |
+| `CW-21` | Cloud-to-Local read-through sync for Home Portfolio and Command Palette | Done | High |
+| `CW-22` | Sprint Burndown Chart with automated completion timestamps on Cycles | Done | High |
+| `CW-23` | Interactive Flowchart Step Editor for custom user, system, and backend flows | Done | Medium |
+| `CW-24` | Kanto Gym Badge Case & Engineering XP gamification system | Done | Low |
+| `CW-25` | 1-Click Full Workspace Snapshot Backup and Restore (.json) | Done | Medium |
+| `CW-26` | Pomodoro Focus Timer dock linked to active Kanban work items | Done | Medium |
 
 ---
 

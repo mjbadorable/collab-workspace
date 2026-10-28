@@ -72,6 +72,12 @@ export function seedItems(projectId: string): StoredWorkItem[] {
       seed(18, "Live Project Scratchpad & Realtime Team Room dock", "done", "medium", mockUser.id),
       seed(19, "1-Click CSV & JSON Bulk Import and Export on Work Items", "done", "medium", mockUser.id),
       seed(20, "Git Commit Linking & PR Direct Resolver on Work Items", "done", "medium", mockUser.id),
+      seed(21, "Cloud-to-Local read-through sync for Home Portfolio and Command Palette", "done", "high", mockUser.id),
+      seed(22, "Sprint Burndown Chart with automated completion timestamps on Cycles", "done", "high", mockUser.id),
+      seed(23, "Interactive Flowchart Step Editor for custom user, system, and backend flows", "done", "medium", mockUser.id),
+      seed(24, "Kanto Gym Badge Case & Engineering XP gamification system", "done", "low", mockUser.id),
+      seed(25, "1-Click Full Workspace Snapshot Backup and Restore (.json)", "done", "medium", mockUser.id),
+      seed(26, "Pomodoro Focus Timer dock linked to active Kanban work items", "done", "medium", mockUser.id),
     ];
   }
 
@@ -95,7 +101,7 @@ export function seedItems(projectId: string): StoredWorkItem[] {
   ];
 }
 
-const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v3";
+const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v4";
 
 // One-time upgrade of a board saved before CW-1..CW-15 were all shipped. Seed items are matched by title: one that
 // exists is marked done, one that is missing is added (keeping its CW number unless a newer item already uses it).

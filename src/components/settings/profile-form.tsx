@@ -4,6 +4,7 @@ import { useRef, useState, type FormEvent } from "react";
 import { Camera, Loader2, Trash2 } from "lucide-react";
 import { fileToAvatar } from "@/lib/image-resize";
 import { ROLES, roleTone, useProfile, type RoleTitle } from "@/lib/profile-context";
+import GymBadgeCase from "@/components/home/gym-badge-case";
 import Avatar from "./avatar";
 
 const fieldClass =
@@ -23,7 +24,16 @@ const BIO_IDEAS = [
   "Automating pipelines & squashing bugs one commit at a time",
 ];
 
-export default function ProfileForm({ onCancel, onSaved }: { onCancel?: () => void; onSaved?: () => void }) {
+export default function ProfileForm({
+  onCancel,
+  onSaved,
+  showBadges = false,
+}: {
+  onCancel?: () => void;
+  onSaved?: () => void;
+  // The Gym Badge Case shows under the form in Settings > Profile, not in the Edit Profile dialog.
+  showBadges?: boolean;
+}) {
   const { profile, displayName, email, signedIn, updateProfile } = useProfile();
   const fileRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(displayName);
@@ -70,6 +80,7 @@ export default function ProfileForm({ onCancel, onSaved }: { onCancel?: () => vo
   };
 
   return (
+    <div className="space-y-6">
     <form onSubmit={submit} className="space-y-4">
       <div className="flex items-center gap-4">
         <Avatar url={avatar} name={name || displayName} className="h-20 w-20 text-xl" />
@@ -230,5 +241,7 @@ export default function ProfileForm({ onCancel, onSaved }: { onCancel?: () => vo
         </button>
       </div>
     </form>
+      {showBadges && <GymBadgeCase />}
+    </div>
   );
 }

@@ -31,6 +31,7 @@ import {
 } from "@/lib/checklist";
 import { getCycles } from "@/lib/cycles";
 import { initials, mockUser } from "@/lib/mock-data";
+import { startFocusTimer } from "@/lib/focus-timer";
 import { getModules } from "@/lib/modules";
 import { getProjects } from "@/lib/projects";
 import { useProfile } from "@/lib/profile-context";
@@ -365,6 +366,7 @@ function WorkItemRow({
   onChange,
   onEdit,
   onDelete,
+  onFocus,
 }: {
   item: StoredWorkItem;
   projectId: string;
@@ -375,6 +377,7 @@ function WorkItemRow({
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
   onDelete: () => void;
+  onFocus: () => void;
 }) {
   const key = workItemKey(projectId, item.seq);
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
@@ -443,6 +446,17 @@ function WorkItemRow({
       >
         <Pencil className="h-4 w-4" />
       </button>
+      {item.status !== "done" && (
+        <button
+          type="button"
+          onClick={onFocus}
+          aria-label={`Focus on ${key}`}
+          title="Start a 25-minute focus session on this item"
+          className="shrink-0 rounded-md border border-neutral-200 px-2 py-0.5 text-xs font-medium text-neutral-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+        >
+          🎯 Focus
+        </button>
+      )}
       <button
         type="button"
         onClick={onDelete}
@@ -472,6 +486,7 @@ function BoardCard({
   onChange,
   onEdit,
   onDelete,
+  onFocus,
 }: {
   item: StoredWorkItem;
   projectId: string;
@@ -482,6 +497,7 @@ function BoardCard({
   onChange: (patch: Partial<StoredWorkItem>) => void;
   onEdit: () => void;
   onDelete: () => void;
+  onFocus: () => void;
 }) {
   const key = workItemKey(projectId, item.seq);
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
@@ -519,6 +535,17 @@ function BoardCard({
       <div className="flex items-center justify-between gap-2">
         <span className="rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-xs text-neutral-600">{key}</span>
         <div className="flex items-center">
+          {item.status !== "done" && (
+            <button
+              type="button"
+              onClick={onFocus}
+              aria-label={`Focus on ${key}`}
+              title="Start a 25-minute focus session on this item"
+              className="mr-1 rounded-md border border-neutral-200 px-1.5 py-0.5 text-xs font-medium text-neutral-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700"
+            >
+              🎯 Focus
+            </button>
+          )}
           <button
             type="button"
             onClick={onEdit}
@@ -614,6 +641,7 @@ function KanbanBoard({
   onChange,
   onEdit,
   onDelete,
+  onFocus,
   onQuickAdd,
   highlight,
 }: {
@@ -626,6 +654,7 @@ function KanbanBoard({
   onChange: (id: string, patch: Partial<StoredWorkItem>) => void;
   onEdit: (item: StoredWorkItem) => void;
   onDelete: (id: string) => void;
+  onFocus: (item: StoredWorkItem) => void;
   onQuickAdd: (status: WorkItemStatus) => void;
   highlight: WorkItemStatus | null;
 }) {
@@ -693,6 +722,7 @@ function KanbanBoard({
                   onChange={(patch) => onChange(item.id, patch)}
                   onEdit={() => onEdit(item)}
                   onDelete={() => onDelete(item.id)}
+                  onFocus={() => onFocus(item)}
                 />
               ))}
             </ul>
@@ -1104,6 +1134,12 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     if (!editingItem && dialog.open) dialog.close();
   }, [editingItem]);
 
+  // Starts a 25-minute focus session on the item, and moves it out of the backlog if it was still there.
+  const focusOn = (item: StoredWorkItem) => {
+    if (item.status === "backlog") update(item.id, { status: "in_progress" });
+    startFocusTimer(workItemKey(projectId, item.seq), item.title);
+  };
+
   const needle = query.trim().toLowerCase();
   const live = items
     .filter((i) => !i.deleted_at)
@@ -1236,6 +1272,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             onChange={update}
             onEdit={setEditingItem}
             onDelete={softDelete}
+            onFocus={focusOn}
             onQuickAdd={(status) => {
               setPresetStatus(status);
               openDialog();
@@ -1267,6 +1304,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
                 onChange={(patch) => update(item.id, patch)}
                 onEdit={() => setEditingItem(item)}
                 onDelete={() => softDelete(item.id)}
+                onFocus={() => focusOn(item)}
               />
             ))}
           </ul>

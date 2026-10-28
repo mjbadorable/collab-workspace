@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Download, Plus, Upload } from "lucide-react";
+import { exportFullWorkspaceBackup, restoreFullWorkspaceBackup } from "@/lib/workspace-backup";
 import { useAuth } from "@/lib/auth-context";
 import { fetchMembers, type Member } from "@/lib/members";
 import { initials, mockUser, mockWorkspace } from "@/lib/mock-data";
@@ -37,8 +38,63 @@ function Profile() {
     <div className="space-y-5">
       <h2 className="text-base font-semibold">Profile</h2>
       <div className="max-w-md">
-        <ProfileForm />
+        <ProfileForm showBadges />
       </div>
+    </div>
+  );
+}
+
+// Everything this app keeps on the device (boards, runbooks, cycles, chat, settings) as one .json file.
+function BackupSection() {
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const restore = async (file: File | undefined) => {
+    if (!file) return;
+    setMessage(null);
+    if (!window.confirm("This will restore all workspace settings, runbooks, and items on this device. Continue?")) return;
+    const result = await restoreFullWorkspaceBackup(await file.text());
+    setMessage(
+      result.ok
+        ? { ok: true, text: `Restored ${result.count} items. Reloading…` }
+        : { ok: false, text: result.error ?? "The backup could not be restored." }
+    );
+  };
+
+  return (
+    <div className="max-w-md rounded-lg border border-neutral-200 p-4">
+      <h3 className="text-sm font-semibold">Workspace Backup &amp; Cross-Device Migration</h3>
+      <p className="mt-1 text-sm text-neutral-500">
+        Save everything stored on this device as one file, and restore it on another device or browser. The file includes
+        chat history and any webhook URLs, so keep it private.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={exportFullWorkspaceBackup}
+          className="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          <Download className="h-4 w-4" aria-hidden /> Export Workspace Snapshot
+        </button>
+        <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100">
+          <Upload className="h-4 w-4" aria-hidden /> Restore Snapshot
+          <input
+            type="file"
+            accept=".json,application/json"
+            className="sr-only"
+            onChange={(e) => {
+              const input = e.currentTarget;
+              void restore(input.files?.[0]).finally(() => {
+                input.value = "";
+              });
+            }}
+          />
+        </label>
+      </div>
+      {message && (
+        <p role={message.ok ? "status" : "alert"} className={`mt-3 rounded-md px-2.5 py-1.5 text-sm ${message.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}>
+          {message.text}
+        </p>
+      )}
     </div>
   );
 }
@@ -68,6 +124,8 @@ function General() {
           </p>
         </div>
       )}
+
+      <BackupSection />
 
       <div className="max-w-md rounded-lg border border-red-200 p-4">
         <h3 className="text-sm font-semibold text-red-700">Danger zone</h3>

@@ -8,6 +8,7 @@ import { ProfileProvider } from "@/lib/profile-context";
 import { ProjectsProvider } from "@/lib/projects-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import CommandPalette from "./command-palette";
+import FocusTimerDock from "./focus-timer-dock";
 import TeamRoomDock from "./projects/team-room-dock";
 import EditProfileDialog from "./settings/edit-profile-dialog";
 import InviteDialog from "./settings/invite-dialog";
@@ -116,6 +117,7 @@ function Chrome({ children }: { children: ReactNode }) {
       </div>
     </div>
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
+    <FocusTimerDock />
     <InviteDialog open={inviteRequested} onClose={() => setInviteRequested(false)} />
     <EditProfileDialog open={profileRequested} onClose={() => setProfileRequested(false)} />
     {projectId && <TeamRoomDock key={projectId} projectId={projectId} />}
