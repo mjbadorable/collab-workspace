@@ -73,7 +73,7 @@ async function upgradeCollabCloudProject(
   isCancelled: () => boolean
 ): Promise<StoredWorkItem[]> {
   if (projectId !== "collab-workspace") return current;
-  const guard = `collab-workspace:cloud-nextgen-v7:${projectUuid}`;
+  const guard = `collab-workspace:cloud-nextgen-v8:${projectUuid}`;
   try {
     if (localStorage.getItem(guard)) return current;
     localStorage.setItem(guard, "1");

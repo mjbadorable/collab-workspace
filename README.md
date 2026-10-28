@@ -146,6 +146,10 @@ collab-workspace/
 | `CW-34` | Collapsible Workspace Roadmap grid showing the six newest milestones | Done | Low |
 | `CW-35` | Collapsible desktop sidebar toggle for full-width boards and diagrams | Done | Low |
 | `CW-36` | Label and Cycle filter dropdowns on the Work Items toolbar | Done | Medium |
+| `CW-37` | Priority, Assignee and Blocked-only filters with sort order on the Work Items toolbar | Done | Medium |
+| `CW-38` | 60-second health heartbeat with re-check button and latency telemetry popover | Done | High |
+| `CW-39` | 1-click Assign Tickets pickers on Cycle and Module cards | Done | Medium |
+| `CW-40` | Deep-dive engineering analytics: 14-day velocity, cycle and module progress, hygiene scorecard | Done | Medium |
 
 ---
 

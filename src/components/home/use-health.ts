@@ -103,24 +103,52 @@ function reportOffline(url: string) {
   }
 }
 
-type Result = { key: string; health: Health };
+type Result = { key: string; url: string; manual: number; health: Health };
 
-// Pings /api/health-check for a project's live URL. Re-checks when the URL changes or recheck() is called.
-// Every finished check is also appended to that URL's history (last 12, kept in localStorage).
+export type LatencyStats = { minMs: number | null; avgMs: number | null; maxMs: number | null };
+
+export const POLL_INTERVAL_MS = 60_000;
+
+// Min / average / max latency over the passing checks in the history.
+function latencyStats(history: HealthSample[]): LatencyStats {
+  const latencies = history.filter((s) => s.ok).map((s) => s.latencyMs);
+  if (latencies.length === 0) return { minMs: null, avgMs: null, maxMs: null };
+  return {
+    minMs: Math.min(...latencies),
+    avgMs: Math.round(latencies.reduce((sum, ms) => sum + ms, 0) / latencies.length),
+    maxMs: Math.max(...latencies),
+  };
+}
+
+// Pings /api/health-check for a project's live URL: when the URL changes, when recheck() is called, and every
+// minute while the tab is visible, so an open dashboard keeps recording uptime. The status shown stays put during a
+// background poll; only a manual re-check shows "Checking…". Every finished check is appended to that URL's history
+// (last 12, kept in localStorage).
 export function useHealth(url: string): {
   health: Health;
   history: HealthSample[];
   uptimePercent: number | null;
+  stats: LatencyStats;
   recheck: () => void;
 } {
-  const [nonce, setNonce] = useState(0);
+  const [manual, setManual] = useState(0);
+  const [polls, setPolls] = useState(0);
   const [result, setResult] = useState<Result | null>(null);
-  const key = `${url}|${nonce}`;
+  const key = `${url}|${manual}|${polls}`;
   const history = useSyncExternalStore(
     subscribeHistory,
     () => (url ? readHistory(url) : EMPTY_HISTORY),
     () => EMPTY_HISTORY
   );
+
+  // The heartbeat: a fresh check each minute, skipped while the tab is in the background.
+  useEffect(() => {
+    if (!url) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") setPolls((n) => n + 1);
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [url]);
 
   useEffect(() => {
     if (!url) return;
@@ -132,6 +160,8 @@ export function useHealth(url: string): {
         if (!d.ok) reportOffline(url);
         setResult({
           key,
+          url,
+          manual,
           health: d.ok ? { state: "online", status: d.status, latencyMs: d.latencyMs } : { state: "offline" },
         });
       })
@@ -139,14 +169,19 @@ export function useHealth(url: string): {
         if (controller.signal.aborted) return;
         appendSample(url, { ts: Date.now(), ok: false, status: 0, latencyMs: 0 });
         reportOffline(url);
-        setResult({ key, health: { state: "offline" } });
+        setResult({ key, url, manual, health: { state: "offline" } });
       });
     return () => controller.abort();
-  }, [url, key]);
+  }, [url, key, manual]);
 
-  const health: Health = !url ? { state: "none" } : result?.key === key ? result.health : { state: "checking" };
+  // A background poll in flight keeps showing the last answer; a first check or a manual re-check shows "Checking…".
+  const health: Health = !url
+    ? { state: "none" }
+    : result?.key === key || (result?.url === url && result.manual === manual)
+      ? result.health
+      : { state: "checking" };
   const uptimePercent = history.length ? Math.round((history.filter((s) => s.ok).length / history.length) * 100) : null;
-  return { health, history, uptimePercent, recheck: () => setNonce((n) => n + 1) };
+  return { health, history, uptimePercent, stats: latencyStats(history), recheck: () => setManual((n) => n + 1) };
 }
 
 export function healthLabel(health: Health): string {

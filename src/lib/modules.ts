@@ -61,6 +61,20 @@ export function getModules(projectId: string): ProjectModule[] {
   return seedModules(projectId);
 }
 
+function saveModules(projectId: string, modules: ProjectModule[]): ProjectModule[] {
+  try {
+    localStorage.setItem(storageKey(projectId), JSON.stringify(modules));
+  } catch {
+    // storage blocked: the change lasts for this session only
+  }
+  return modules;
+}
+
+// Saves the whole list (built-in modules included) with the one module changed.
+export function updateModule(projectId: string, id: string, patch: Partial<Omit<ProjectModule, "id">>): ProjectModule[] {
+  return saveModules(projectId, getModules(projectId).map((m) => (m.id === id ? { ...m, ...patch } : m)));
+}
+
 export function createModule(
   projectId: string,
   input: { name: string; description: string; icon: string; lead: string; ticketKeys: string[] }

@@ -24,7 +24,7 @@ function Content({ params }: { params: Params }) {
         <span className="text-neutral-900">Dashboards</span>
       </nav>
       <h1 className="mb-4 text-xl font-semibold">Dashboards</h1>
-      <ProjectAnalytics projectId={id} />
+      <ProjectAnalytics projectId={id} detailed />
     </div>
   );
 }

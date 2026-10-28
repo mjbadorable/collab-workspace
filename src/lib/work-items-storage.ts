@@ -88,6 +88,10 @@ export function seedItems(projectId: string): StoredWorkItem[] {
       seed(34, "Collapsible Workspace Roadmap grid showing the six newest milestones", "done", "low", mockUser.id),
       seed(35, "Collapsible desktop sidebar toggle for full-width boards and diagrams", "done", "low", mockUser.id),
       seed(36, "Label and Cycle filter dropdowns on the Work Items toolbar", "done", "medium", mockUser.id),
+      seed(37, "Priority, Assignee and Blocked-only filters with sort order on the Work Items toolbar", "done", "medium", mockUser.id),
+      seed(38, "60-second health heartbeat with re-check button and latency telemetry popover", "done", "high", mockUser.id),
+      seed(39, "1-click Assign Tickets pickers on Cycle and Module cards", "done", "medium", mockUser.id),
+      seed(40, "Deep-dive engineering analytics: 14-day velocity, cycle and module progress, hygiene scorecard", "done", "medium", mockUser.id),
     ];
   }
 
@@ -111,7 +115,7 @@ export function seedItems(projectId: string): StoredWorkItem[] {
   ];
 }
 
-const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v7";
+const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v8";
 
 // Earlier wordings of seed titles, so a board that already holds the old title is not given a duplicate.
 export const SEED_TITLE_ALIASES: Record<string, string[]> = {

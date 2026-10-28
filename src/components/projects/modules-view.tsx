@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
-import { parseDescription } from "@/lib/checklist";
-import { createModule, getModules, type ProjectModule } from "@/lib/modules";
+import { metaFromParsed, parseDescription, serializeDescription } from "@/lib/checklist";
+import { createModule, getModules, updateModule, type ProjectModule } from "@/lib/modules";
 import { useProfile } from "@/lib/profile-context";
 import { useProjects } from "@/lib/projects-context";
 import { useIsClient } from "@/lib/use-is-client";
 import { workItemKey, type StoredWorkItem, type WorkItemStatus } from "@/lib/work-items-storage";
 import { ProjectNotFound } from "./project-overview";
+import AssignTicketsDialog from "./assign-tickets-dialog";
 import WorkItemsSource from "./work-items-source";
 
 const MAX_TICKETS = 6;
@@ -26,7 +27,17 @@ function itemsOfModule(projectId: string, module: ProjectModule, items: StoredWo
   );
 }
 
-function ModuleCard({ projectId, module, items }: { projectId: string; module: ProjectModule; items: StoredWorkItem[] }) {
+function ModuleCard({
+  projectId,
+  module,
+  items,
+  onAssign,
+}: {
+  projectId: string;
+  module: ProjectModule;
+  items: StoredWorkItem[];
+  onAssign: () => void;
+}) {
   const done = items.filter((i) => i.status === "done").length;
   const percent = items.length ? Math.round((done / items.length) * 100) : 0;
   const shown = items.slice(0, MAX_TICKETS);
@@ -80,6 +91,13 @@ function ModuleCard({ projectId, module, items }: { projectId: string; module: P
       ) : (
         <p className="mt-3 text-xs text-neutral-500">No tickets linked yet.</p>
       )}
+      <button
+        type="button"
+        onClick={onAssign}
+        className="mt-3 w-fit rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+      >
+        Assign tickets
+      </button>
     </li>
   );
 }
@@ -170,10 +188,19 @@ function NewModuleDialog({
   );
 }
 
-function Modules({ projectId, items }: { projectId: string; items: StoredWorkItem[] | null }) {
+function Modules({
+  projectId,
+  items,
+  update,
+}: {
+  projectId: string;
+  items: StoredWorkItem[] | null;
+  update: (id: string, patch: Partial<StoredWorkItem>) => void;
+}) {
   const { displayName } = useProfile();
   const [modules, setModules] = useState<ProjectModule[]>(() => getModules(projectId));
   const [creating, setCreating] = useState(false);
+  const [assigning, setAssigning] = useState<ProjectModule | null>(null);
   const live = (items ?? []).filter((i) => !i.deleted_at).sort((a, b) => a.seq - b.seq);
 
   return (
@@ -192,10 +219,33 @@ function Modules({ projectId, items }: { projectId: string; items: StoredWorkIte
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">
           {modules.map((m) => (
-            <ModuleCard key={m.id} projectId={projectId} module={m} items={itemsOfModule(projectId, m, live)} />
+            <ModuleCard key={m.id} projectId={projectId} module={m} items={itemsOfModule(projectId, m, live)} onAssign={() => setAssigning(m)} />
           ))}
         </ul>
       )}
+      <AssignTicketsDialog
+        open={assigning !== null}
+        onClose={() => setAssigning(null)}
+        title={assigning ? `Assign tickets to ${assigning.name}` : "Assign tickets"}
+        projectId={projectId}
+        items={live}
+        isAssigned={(i) => assigning !== null && itemsOfModule(projectId, assigning, [i]).length > 0}
+        onToggle={(item, assigned) => {
+          if (!assigning) return;
+          const p = parseDescription(item.description);
+          update(item.id, {
+            description: serializeDescription(p.notes, p.tasks, { ...metaFromParsed(p), module: assigned ? assigning.name : null }),
+          });
+          // A built-in or custom module may also list this ticket by key; keep that list in step.
+          const key = workItemKey(projectId, item.seq);
+          const listed = assigning.ticketKeys.includes(key);
+          if (assigned !== listed) {
+            const ticketKeys = assigned ? [...assigning.ticketKeys, key] : assigning.ticketKeys.filter((k) => k !== key);
+            setModules(updateModule(projectId, assigning.id, { ticketKeys }));
+            setAssigning({ ...assigning, ticketKeys });
+          }
+        }}
+      />
       <NewModuleDialog
         open={creating}
         defaultLead={displayName}
@@ -227,7 +277,7 @@ export default function ModulesView({ projectId }: { projectId: string }) {
       <p className="mb-6 text-sm text-neutral-500">Group related work into functional feature epics and track each one&apos;s progress.</p>
       {/* Remounted per project so the module list never shows another project's data. */}
       <WorkItemsSource key={project.id} projectId={project.id} fallback={<div className="h-64" />}>
-        {({ items }) => <Modules projectId={project.id} items={items} />}
+        {({ items, update }) => <Modules projectId={project.id} items={items} update={update} />}
       </WorkItemsSource>
     </div>
   );

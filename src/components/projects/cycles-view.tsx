@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Plus, RefreshCw } from "lucide-react";
-import { parseDescription, serializeDescription } from "@/lib/checklist";
+import { metaFromParsed, parseDescription, serializeDescription } from "@/lib/checklist";
 import {
   computeBurndownData,
   createCycle,
@@ -20,6 +20,7 @@ import { useIsClient } from "@/lib/use-is-client";
 import { workItemKey, type StoredWorkItem, type WorkItemStatus } from "@/lib/work-items-storage";
 import { ProjectNotFound } from "./project-overview";
 import { fireConfetti } from "@/components/confetti-burst";
+import AssignTicketsDialog from "./assign-tickets-dialog";
 import WorkItemsSource from "./work-items-source";
 
 type Api = Parameters<Parameters<typeof WorkItemsSource>[0]["children"]>[0];
@@ -174,12 +175,14 @@ function CycleCard({
   items,
   onStatus,
   onCycleStatus,
+  onAssign,
 }: {
   projectId: string;
   cycle: Cycle;
   items: StoredWorkItem[];
   onStatus: (id: string, status: WorkItemStatus) => void;
   onCycleStatus: (status: CycleStatus) => void;
+  onAssign: () => void;
 }) {
   return (
     <section aria-label={cycle.name} className="rounded-xl border border-neutral-200 bg-white shadow-xs">
@@ -192,6 +195,9 @@ function CycleCard({
               {cycle.description && ` · ${cycle.description}`}
             </p>
           </div>
+          <button type="button" onClick={onAssign} className="rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100">
+            Assign tickets
+          </button>
           {cycle.status === "upcoming" && (
             <button type="button" onClick={() => onCycleStatus("active")} className="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50">
               Start cycle
@@ -286,6 +292,7 @@ function Planner({ projectId, api }: { projectId: string; api: Api }) {
   const [cycles, setCycles] = useState<Cycle[]>(() => getCycles(projectId));
   const [tab, setTab] = useState<CycleStatus>("active");
   const [creating, setCreating] = useState(false);
+  const [assigning, setAssigning] = useState<Cycle | null>(null);
   const [adding, setAdding] = useState(false);
   const [taskTitle, setTaskTitle] = useState("");
 
@@ -387,6 +394,7 @@ function Planner({ projectId, api }: { projectId: string; api: Api }) {
               cycle={c}
               items={itemsOf(c)}
               onStatus={(id, status) => api.update(id, { status })}
+              onAssign={() => setAssigning(c)}
               onCycleStatus={(status) => {
                 setCycles(updateCycle(projectId, c.id, { status }));
                 if (status === "completed") fireConfetti();
@@ -399,6 +407,29 @@ function Planner({ projectId, api }: { projectId: string; api: Api }) {
       <p className="text-xs text-neutral-500">
         Tag a work item with a cycle when you create or edit it; untagged items fall into the cycle that was running when they were created.
       </p>
+
+      <AssignTicketsDialog
+        open={assigning !== null}
+        onClose={() => setAssigning(null)}
+        title={assigning ? `Assign tickets to ${assigning.name}` : "Assign tickets"}
+        projectId={projectId}
+        items={live}
+        isAssigned={(i) => assigning !== null && parseDescription(i.description).cycle === assigning.name}
+        // Untagged tickets already count toward the cycle that was running when they were created.
+        note={(i) => {
+          const p = parseDescription(i.description);
+          if (assigning === null) return null;
+          if (p.cycle && p.cycle !== assigning.name) return `in ${p.cycle.split(":")[0]}`;
+          return !p.cycle && itemCycleId(cycles, null, i.created_at) === assigning.id ? "in cycle by date" : null;
+        }}
+        onToggle={(item, assigned) => {
+          if (!assigning) return;
+          const p = parseDescription(item.description);
+          api.update(item.id, {
+            description: serializeDescription(p.notes, p.tasks, { ...metaFromParsed(p), cycle: assigned ? assigning.name : null }),
+          });
+        }}
+      />
 
       <NewCycleDialog open={creating} onClose={() => setCreating(false)} onCreate={(input) => setCycles(createCycle(projectId, input))} />
     </div>

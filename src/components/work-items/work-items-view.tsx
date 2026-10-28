@@ -61,6 +61,18 @@ const parseStatus = (value: string | null): WorkItemStatus | null => statusOptio
 
 const VIEW_KEY = "collab-workspace:work-items-view";
 
+type SortOrder = "newest" | "oldest" | "priority" | "due";
+
+// "oldest" is the board's natural order (CW-1 first), so it is the default.
+const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "priority", label: "Priority (High → Low)" },
+  { value: "due", label: "Due date (Soonest)" },
+];
+
+const PRIORITY_RANK: Record<WorkItemPriority, number> = { high: 0, medium: 1, low: 2 };
+
 const viewOptions: { value: ViewMode; label: string; icon: LucideIcon }[] = [
   { value: "list", label: "List", icon: List },
   { value: "board", label: "Board", icon: Kanban },
@@ -1186,6 +1198,11 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
   const [query, setQuery] = useState("");
   const [labelFilter, setLabelFilter] = useState<"all" | WorkItemLabel>("all");
   const [cycleFilter, setCycleFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState<"all" | WorkItemPriority>("all");
+  // "all", "me", "unassigned", or a member's user id
+  const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [blockedOnly, setBlockedOnly] = useState(false);
+  const [sortOrder, setSortOrder] = useState<SortOrder>("oldest");
   const [transferring, setTransferring] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -1260,19 +1277,51 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
         parseDescription(i.description).notes.toLowerCase().includes(needle)
     )
     .filter((i) => {
-      if (labelFilter === "all" && cycleFilter === "all") return true;
+      if (priorityFilter !== "all" && i.priority !== priorityFilter) return false;
+      if (assigneeFilter === "me" && i.assignee_id !== me.id) return false;
+      if (assigneeFilter === "unassigned" && i.assignee_id !== null) return false;
+      if (assigneeFilter !== "all" && assigneeFilter !== "me" && assigneeFilter !== "unassigned" && i.assignee_id !== assigneeFilter) return false;
       const p = parseDescription(i.description);
+      // Blocked means its blocker is on the board and not done yet.
+      if (blockedOnly && !(p.blockedBy && statusByKey.has(p.blockedBy) && statusByKey.get(p.blockedBy) !== "done")) return false;
       if (labelFilter !== "all" && p.label !== labelFilter) return false;
       if (cycleFilter === "all") return true;
       // Tagged items match by tag; untagged ones by the cycle that was running when they were created.
       return p.cycle ? p.cycle === cycleFilter : filterCycle !== null && itemCycleId(cycles, null, i.created_at) === filterCycle.id;
     })
-    .sort((a, b) => a.seq - b.seq);
-  const filtersActive = needle !== "" || labelFilter !== "all" || cycleFilter !== "all" || filter !== "all";
+    .sort((a, b) => {
+      switch (sortOrder) {
+        case "newest":
+          return b.seq - a.seq;
+        case "priority":
+          return PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || a.seq - b.seq;
+        case "due": {
+          // Soonest first; items without a due date go last.
+          const da = parseDescription(a.description).dueDate ?? "9999-99-99";
+          const db = parseDescription(b.description).dueDate ?? "9999-99-99";
+          return da.localeCompare(db) || a.seq - b.seq;
+        }
+        default:
+          return a.seq - b.seq;
+      }
+    });
+  const filtersActive =
+    needle !== "" ||
+    labelFilter !== "all" ||
+    cycleFilter !== "all" ||
+    priorityFilter !== "all" ||
+    assigneeFilter !== "all" ||
+    blockedOnly ||
+    sortOrder !== "oldest" ||
+    filter !== "all";
   const clearFilters = () => {
+    setSortOrder("oldest");
     setQuery("");
     setLabelFilter("all");
     setCycleFilter("all");
+    setPriorityFilter("all");
+    setAssigneeFilter("all");
+    setBlockedOnly(false);
     setFilter("all");
   };
   const visible = filter === "all" ? live : live.filter((i) => i.status === filter);
@@ -1398,6 +1447,58 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
           {cycleNames.map((name) => (
             <option key={name} value={name}>
               {name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(priorityOptions.find((p) => p.value === e.target.value)?.value ?? "all")}
+          aria-label="Filter by priority"
+          className="rounded-md border border-neutral-300 bg-white py-1 pl-2 pr-6 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        >
+          <option value="all">All priorities</option>
+          {[...priorityOptions].reverse().map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={assigneeFilter}
+          onChange={(e) => setAssigneeFilter(e.target.value)}
+          aria-label="Filter by assignee"
+          className="max-w-44 rounded-md border border-neutral-300 bg-white py-1 pl-2 pr-6 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        >
+          <option value="all">All assignees</option>
+          <option value="me">Assigned to me</option>
+          <option value="unassigned">Unassigned</option>
+          {people
+            .filter((p) => p.id !== me.id)
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+        </select>
+        <button
+          type="button"
+          aria-pressed={blockedOnly}
+          onClick={() => setBlockedOnly((v) => !v)}
+          className={`rounded-full border px-2.5 py-1 text-sm ${
+            blockedOnly ? "border-red-300 bg-red-50 font-medium text-red-700" : "border-neutral-300 text-neutral-600 hover:bg-neutral-100"
+          }`}
+        >
+          ⛔ Blocked
+        </button>
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(SORT_OPTIONS.find((o) => o.value === e.target.value)?.value ?? "oldest")}
+          aria-label="Sort order"
+          className="rounded-md border border-neutral-300 bg-white py-1 pl-2 pr-6 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        >
+          {SORT_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
             </option>
           ))}
         </select>
