@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ChevronRight, Kanban, List, ListChecks, Pencil, Plus, Search, Trash2, X, type LucideIcon } from "lucide-react";
@@ -15,7 +15,9 @@ import {
   type SubTask,
   type WorkItemLabel,
 } from "@/lib/checklist";
+import { getCycles } from "@/lib/cycles";
 import { initials, mockUser } from "@/lib/mock-data";
+import { getModules } from "@/lib/modules";
 import { getProjects } from "@/lib/projects";
 import { useProfile } from "@/lib/profile-context";
 import { useStorageTarget } from "@/lib/storage-target";
@@ -104,6 +106,9 @@ type Me = { id: string; name: string };
 type Person = { id: string; name: string; avatar_url: string | null };
 
 const nameFromEmail = (email: string) => email.split("@")[0].replace(/[._-]+/g, " ");
+
+// A work item may carry a cycle or module that no longer exists; keep it selectable so saving does not drop it.
+const withCurrent = (names: string[], current: string | null) => (current && !names.includes(current) ? [...names, current] : names);
 
 // Unassigned, then me, then everyone else; a leftover assignee who is no longer a member keeps a label so the select stays valid.
 function assigneeOptions(people: Person[], me: Me, currentId: string | null): { value: string; label: string }[] {
@@ -201,12 +206,34 @@ function SubtaskPill({ tasks, expanded, onToggle }: { tasks: SubTask[]; expanded
 }
 
 // Type label and due-date badges shown on cards and rows.
-function ItemMeta({ label, dueDate, status }: { label: WorkItemLabel | null; dueDate: string | null; status: WorkItemStatus }) {
+function ItemMeta({
+  label,
+  dueDate,
+  cycle,
+  module,
+  status,
+}: {
+  label: WorkItemLabel | null;
+  dueDate: string | null;
+  cycle: string | null;
+  module: string | null;
+  status: WorkItemStatus;
+}) {
   const due = dueBadge(dueDate, status);
-  if (!label && !due) return null;
+  if (!label && !due && !cycle && !module) return null;
   return (
     <>
       {label && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${labelTone(label)}`}>{label}</span>}
+      {cycle && (
+        <span title={`Cycle: ${cycle}`} className="max-w-40 shrink-0 truncate rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600">
+          🔁 {cycle}
+        </span>
+      )}
+      {module && (
+        <span title={`Module: ${module}`} className="max-w-40 shrink-0 truncate rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-600">
+          ▣ {module}
+        </span>
+      )}
       {due && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${due.tone}`}>{due.text}</span>}
     </>
   );
@@ -318,7 +345,7 @@ function WorkItemRow({
         {notes && <p className="truncate text-xs text-neutral-500">{notes}</p>}
       </button>
       <SubtaskPill tasks={tasks} />
-      <ItemMeta label={parsed.label} dueDate={parsed.dueDate} status={item.status} />
+      <ItemMeta label={parsed.label} dueDate={parsed.dueDate} cycle={parsed.cycle} module={parsed.module} status={item.status} />
       <PillSelect
         label={`Status of ${key}`}
         value={item.status}
@@ -397,7 +424,14 @@ function BoardCard({
   // Checking a sub-task rewrites the description in place, keeping the notes, label and due date.
   const toggleTask = (index: number) => {
     const next = tasks.map((t, i) => (i === index ? { ...t, done: !t.done } : t));
-    onChange({ description: serializeDescription(notes, next, { label: parsed.label, dueDate: parsed.dueDate }) });
+    onChange({
+      description: serializeDescription(notes, next, {
+        label: parsed.label,
+        dueDate: parsed.dueDate,
+        cycle: parsed.cycle,
+        module: parsed.module,
+      }),
+    });
   };
 
   return (
@@ -440,10 +474,10 @@ function BoardCard({
         </p>
         {notes && <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{notes}</p>}
       </button>
-      {(tasks.length > 0 || parsed.label || parsed.dueDate) && (
+      {(tasks.length > 0 || parsed.label || parsed.dueDate || parsed.cycle || parsed.module) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <SubtaskPill tasks={tasks} expanded={showTasks} onToggle={() => setShowTasks((v) => !v)} />
-          <ItemMeta label={parsed.label} dueDate={parsed.dueDate} status={item.status} />
+          <ItemMeta label={parsed.label} dueDate={parsed.dueDate} cycle={parsed.cycle} module={parsed.module} status={item.status} />
         </div>
       )}
       {showTasks && tasks.length > 0 && (
@@ -606,6 +640,8 @@ function ItemForm({
   defaultTitle,
   people,
   me,
+  cycleNames,
+  moduleNames,
   onSubmit,
   onCancel,
 }: {
@@ -617,6 +653,8 @@ function ItemForm({
   defaultTitle?: string;
   people: Person[];
   me: Me;
+  cycleNames: string[];
+  moduleNames: string[];
   onSubmit: (input: NewWorkItemInput) => void;
   onCancel: () => void;
 }) {
@@ -645,6 +683,8 @@ function ItemForm({
         serializeDescription(String(f.get("description") ?? ""), allTasks, {
           label: WORK_ITEM_LABELS.find((l) => l === f.get("label")) ?? null,
           dueDate: String(f.get("due") ?? "") || null,
+          cycle: String(f.get("cycle") ?? "") || null,
+          module: String(f.get("module") ?? "") || null,
         }) ?? "",
       status: f.get("status") as WorkItemStatus,
       priority: f.get("priority") as WorkItemPriority,
@@ -703,6 +743,34 @@ function ItemForm({
             Due date
           </label>
           <input id="wi-due" name="due" type="date" defaultValue={initialParts.dueDate ?? ""} className={fieldClass} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="wi-cycle" className="mb-1 block text-xs font-medium text-neutral-600">
+            Cycle
+          </label>
+          <select id="wi-cycle" name="cycle" defaultValue={initialParts.cycle ?? ""} className={fieldClass}>
+            <option value="">None</option>
+            {withCurrent(cycleNames, initialParts.cycle).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="wi-module" className="mb-1 block text-xs font-medium text-neutral-600">
+            Module
+          </label>
+          <select id="wi-module" name="module" defaultValue={initialParts.module ?? ""} className={fieldClass}>
+            <option value="">None</option>
+            {withCurrent(moduleNames, initialParts.module).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
       <fieldset>
@@ -896,6 +964,10 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     }))
     .concat(workspaceId ? [] : [{ id: mockUser.id, name: mockUser.name, avatar_url: profile.avatar_url }]);
 
+  // Cycle and module choices for the dialogs. WorkItems only renders on the client, so reading localStorage is safe.
+  const cycleNames = useMemo(() => getCycles(projectId).map((c) => c.name), [projectId]);
+  const moduleNames = useMemo(() => getModules(projectId).map((m) => m.name), [projectId]);
+
   // Native <dialog> gives focus trapping, Esc-to-close and an inert page behind it.
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -1088,6 +1160,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             defaultTitle={presetTitle}
             people={people}
             me={me}
+            cycleNames={cycleNames}
+            moduleNames={moduleNames}
             onCancel={closeDialog}
             onSubmit={(input) => {
               add(input);
@@ -1114,6 +1188,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             initial={editingItem}
             people={people}
             me={me}
+            cycleNames={cycleNames}
+            moduleNames={moduleNames}
             onCancel={() => setEditingItem(null)}
             onSubmit={(input) => {
               update(editingItem.id, {

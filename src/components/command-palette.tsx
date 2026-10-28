@@ -71,8 +71,11 @@ function PaletteBody({
       const views: [string, string][] = [
         ["Overview", ""],
         ["Work Items", "/work-items"],
+        ["Cycles", "/cycles"],
+        ["Modules", "/modules"],
         ["System Architecture", "/architecture"],
         ["Process Flowcharts", "/diagrams?category=user"],
+        ["Analytics", "/dashboards"],
         ["Settings", "/settings"],
       ];
       for (const [view, path] of views) {

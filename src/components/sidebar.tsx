@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
+  BarChart3,
+  Boxes,
   BookOpen,
   ChevronDown,
   ChevronRight,
@@ -20,6 +22,7 @@ import {
   Pencil,
   Moon,
   Plus,
+  RefreshCw,
   Search,
   Settings,
   Sun,
@@ -50,12 +53,15 @@ const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
 
 const categoryIcons: Record<"user" | "system" | "backend", LucideIcon> = { user: User, system: Cog, backend: Database };
 
-// The five project sections plus Settings. Cycles, Modules and Dashboards are intentionally not linked.
+// Everything a project offers; "diagrams" also expands into its three flow categories.
 const projectNav: { label: string; slug: string; icon: LucideIcon }[] = [
   { label: "Overview", slug: "", icon: BookOpen },
   { label: "Work items", slug: "work-items", icon: ListTodo },
+  { label: "Cycles", slug: "cycles", icon: RefreshCw },
+  { label: "Modules", slug: "modules", icon: Boxes },
   { label: "System Architecture", slug: "architecture", icon: Landmark },
   { label: "Flowchart / Diagrams", slug: "diagrams", icon: Network },
+  { label: "Analytics", slug: "dashboards", icon: BarChart3 },
   { label: "Settings", slug: "settings", icon: Settings },
 ];
 
