@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { logActivity } from "./activity-log";
 import type { WorkItem } from "./database.types";
 import { ensureCloudProject } from "./cloud-projects";
 import {
@@ -231,6 +232,7 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
   }, [workspaceId, projectId, flash, reload]);
 
   const add = (input: NewWorkItemInput) => {
+    logActivity({ kind: "task", title: "Work item created", detail: input.title.trim() });
     if (!workspaceId) {
       setItems((prev) => addWorkItem(prev ?? [], projectId, input));
       return;
@@ -248,6 +250,10 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
 
   // Optimistic: the UI updates at once, and a failed write reloads the server's version.
   const update = (id: string, patch: Partial<WorkItem>) => {
+    const before = itemsRef.current?.find((i) => i.id === id);
+    if (before && patch.status === "done" && before.status !== "done") {
+      logActivity({ kind: "task", title: "Work item completed", detail: before.title });
+    }
     setItems((prev) => prev && updateWorkItem(prev, id, patch));
     if (!workspaceId) return;
     updateCloudWorkItem(id, patch).then(

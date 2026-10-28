@@ -5,7 +5,16 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ChevronRight, Kanban, List, ListChecks, Pencil, Plus, Search, Trash2, X, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { parseDescription, serializeDescription, taskProgress, type SubTask } from "@/lib/checklist";
+import {
+  dueBadge,
+  labelTone,
+  parseDescription,
+  serializeDescription,
+  taskProgress,
+  WORK_ITEM_LABELS,
+  type SubTask,
+  type WorkItemLabel,
+} from "@/lib/checklist";
 import { initials, mockUser } from "@/lib/mock-data";
 import { getProjects } from "@/lib/projects";
 import { useProfile } from "@/lib/profile-context";
@@ -160,17 +169,16 @@ const REMOTE_FLASH = "animate-pulse bg-indigo-50 ring-2 ring-indigo-400";
 const MAX_AVATARS = 3;
 
 // "☑ 2/4" with a mini progress bar; emerald once every sub-task is checked. Renders nothing without sub-tasks.
-function SubtaskPill({ tasks }: { tasks: SubTask[] }) {
+// With `onToggle` it is a button (aria-expanded) that shows or hides the inline checklist.
+function SubtaskPill({ tasks, expanded, onToggle }: { tasks: SubTask[]; expanded?: boolean; onToggle?: () => void }) {
   if (tasks.length === 0) return null;
   const { done, total, percent } = taskProgress(tasks);
   const complete = done === total;
-  return (
-    <span
-      title={`${done} of ${total} sub-tasks done`}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${
-        complete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-neutral-200 bg-neutral-50 text-neutral-600"
-      }`}
-    >
+  const className = `inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium ${
+    complete ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-neutral-200 bg-neutral-50 text-neutral-600"
+  }`;
+  const content = (
+    <>
       <span aria-hidden>☑</span>
       <span className="tabular-nums">
         {done}/{total}
@@ -178,7 +186,29 @@ function SubtaskPill({ tasks }: { tasks: SubTask[] }) {
       <span className="h-1 w-8 overflow-hidden rounded-full bg-neutral-200" aria-hidden>
         <span className={`block h-full ${complete ? "bg-emerald-500" : "bg-indigo-500"}`} style={{ width: `${percent}%` }} />
       </span>
+    </>
+  );
+  const title = `${done} of ${total} sub-tasks done`;
+  return onToggle ? (
+    <button type="button" onClick={onToggle} aria-expanded={expanded} title={title} className={`${className} cursor-pointer hover:brightness-95`}>
+      {content}
+    </button>
+  ) : (
+    <span title={title} className={className}>
+      {content}
     </span>
+  );
+}
+
+// Type label and due-date badges shown on cards and rows.
+function ItemMeta({ label, dueDate, status }: { label: WorkItemLabel | null; dueDate: string | null; status: WorkItemStatus }) {
+  const due = dueBadge(dueDate, status);
+  if (!label && !due) return null;
+  return (
+    <>
+      {label && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${labelTone(label)}`}>{label}</span>}
+      {due && <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${due.tone}`}>{due.text}</span>}
+    </>
   );
 }
 
@@ -264,7 +294,8 @@ function WorkItemRow({
 }) {
   const key = workItemKey(projectId, item.seq);
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
-  const { notes, tasks } = parseDescription(item.description);
+  const parsed = parseDescription(item.description);
+  const { notes, tasks } = parsed;
 
   return (
     <li
@@ -287,6 +318,7 @@ function WorkItemRow({
         {notes && <p className="truncate text-xs text-neutral-500">{notes}</p>}
       </button>
       <SubtaskPill tasks={tasks} />
+      <ItemMeta label={parsed.label} dueDate={parsed.dueDate} status={item.status} />
       <PillSelect
         label={`Status of ${key}`}
         value={item.status}
@@ -358,7 +390,15 @@ function BoardCard({
 }) {
   const key = workItemKey(projectId, item.seq);
   const priority = priorityOptions.find((p) => p.value === item.priority)!;
-  const { notes, tasks } = parseDescription(item.description);
+  const parsed = parseDescription(item.description);
+  const { notes, tasks } = parsed;
+  const [showTasks, setShowTasks] = useState(false);
+
+  // Checking a sub-task rewrites the description in place, keeping the notes, label and due date.
+  const toggleTask = (index: number) => {
+    const next = tasks.map((t, i) => (i === index ? { ...t, done: !t.done } : t));
+    onChange({ description: serializeDescription(notes, next, { label: parsed.label, dueDate: parsed.dueDate }) });
+  };
 
   return (
     <li
@@ -400,10 +440,27 @@ function BoardCard({
         </p>
         {notes && <p className="mt-1 line-clamp-2 text-xs text-neutral-500">{notes}</p>}
       </button>
-      {tasks.length > 0 && (
-        <div className="mt-2">
-          <SubtaskPill tasks={tasks} />
+      {(tasks.length > 0 || parsed.label || parsed.dueDate) && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <SubtaskPill tasks={tasks} expanded={showTasks} onToggle={() => setShowTasks((v) => !v)} />
+          <ItemMeta label={parsed.label} dueDate={parsed.dueDate} status={item.status} />
         </div>
+      )}
+      {showTasks && tasks.length > 0 && (
+        <ul className="mt-2 space-y-1 rounded-md bg-neutral-50 p-2">
+          {tasks.map((t, i) => (
+            <li key={i} className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={t.done}
+                onChange={() => toggleTask(i)}
+                aria-label={`Mark "${t.text}" ${t.done ? "not done" : "done"}`}
+                className="h-3.5 w-3.5 accent-indigo-600"
+              />
+              <span className={t.done ? "text-neutral-400 line-through" : "text-neutral-700"}>{t.text}</span>
+            </li>
+          ))}
+        </ul>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <span
@@ -582,7 +639,11 @@ function ItemForm({
     const allTasks = pending ? [...tasks, { text: pending, done: false }] : tasks;
     onSubmit({
       title,
-      description: serializeDescription(String(f.get("description") ?? ""), allTasks) ?? "",
+      description:
+        serializeDescription(String(f.get("description") ?? ""), allTasks, {
+          label: WORK_ITEM_LABELS.find((l) => l === f.get("label")) ?? null,
+          dueDate: String(f.get("due") ?? "") || null,
+        }) ?? "",
       status: f.get("status") as WorkItemStatus,
       priority: f.get("priority") as WorkItemPriority,
       assignee_id: String(f.get("assignee") ?? "") || null,
@@ -620,6 +681,27 @@ function ItemForm({
           defaultValue={initialParts.notes}
           className={`${fieldClass} resize-none`}
         />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label htmlFor="wi-label" className="mb-1 block text-xs font-medium text-neutral-600">
+            Label
+          </label>
+          <select id="wi-label" name="label" defaultValue={initialParts.label ?? ""} className={fieldClass}>
+            <option value="">None</option>
+            {WORK_ITEM_LABELS.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="wi-due" className="mb-1 block text-xs font-medium text-neutral-600">
+            Due date
+          </label>
+          <input id="wi-due" name="due" type="date" defaultValue={initialParts.dueDate ?? ""} className={fieldClass} />
+        </div>
       </div>
       <fieldset>
         <legend className="mb-1 block text-xs font-medium text-neutral-600">

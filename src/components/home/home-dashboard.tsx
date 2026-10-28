@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock, Inbox, Landmark, ListTodo, Network, Plus } from "lucide-react";
 import Greeting from "@/components/greeting";
+import ProjectAvatar from "@/components/project-avatar";
 import { priorityOptions, statusOptions } from "@/components/work-items/work-items-view";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import { mockWorkspace } from "@/lib/mock-data";
@@ -11,7 +12,9 @@ import { useProfile } from "@/lib/profile-context";
 import { SEED_PROJECT, type ProjectRecord } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
 import { useWorkspaces } from "@/lib/workspace-context";
-import { workItemKey, type StoredWorkItem } from "@/lib/work-items-storage";
+import { useIsClient } from "@/lib/use-is-client";
+import { loadWorkItems, workItemKey, type StoredWorkItem } from "@/lib/work-items-storage";
+import HealthPill from "./health-pill";
 import LiveWorkItems from "./live-work-items";
 import ProjectCard from "./project-card";
 
@@ -26,7 +29,7 @@ const launchpad = (projectId: string) => [
 ];
 
 // Each card deep-links to the project's work items filtered by that status.
-function Stats({ items, projectId }: { items: StoredWorkItem[] | null; projectId: string }) {
+function Stats({ items, projectId }: { items: StoredWorkItem[] | null; projectId: string | null }) {
   const value = (fn: (i: StoredWorkItem) => boolean) => (items ? items.filter(fn).length : "–");
   const stats = [
     { label: "Open tasks", status: "backlog", value: value((i) => i.status !== "done"), icon: ListTodo },
@@ -38,7 +41,7 @@ function Stats({ items, projectId }: { items: StoredWorkItem[] | null; projectId
       {stats.map(({ label, status, value, icon: Icon }) => (
         <Link
           key={label}
-          href={`/projects/${projectId}/work-items?status=${status}`}
+          href={projectId ? `/projects/${projectId}/work-items?status=${status}` : "/projects"}
           className="group block cursor-pointer rounded-lg border border-neutral-200 bg-white p-4 shadow-sm transition hover:border-red-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
         >
           <div className="flex items-center gap-2 text-sm text-neutral-500">
@@ -111,13 +114,92 @@ function WorkList({ items, project }: { items: StoredWorkItem[] | null; project:
   );
 }
 
+// Highest priority first.
+const PRIORITY_RANK: Record<StoredWorkItem["priority"], number> = { high: 0, medium: 1, low: 2 };
+const QUEUE_SIZE = 8;
+
+// Every project at a glance. Work items come from each project's local board, so this only mounts on the client.
+function Portfolio({ projects }: { projects: ProjectRecord[] }) {
+  const boards = useMemo(
+    () => projects.map((project) => ({ project, items: loadWorkItems(project.id).filter((i) => !i.deleted_at) })),
+    [projects]
+  );
+  const all = boards.flatMap((b) => b.items);
+  const queue = boards
+    .flatMap((b, order) => b.items.filter((i) => i.status !== "done").map((item) => ({ project: b.project, item, order })))
+    .sort((a, b) => PRIORITY_RANK[a.item.priority] - PRIORITY_RANK[b.item.priority] || a.order - b.order || a.item.seq - b.item.seq)
+    .slice(0, QUEUE_SIZE);
+
+  return (
+    <>
+      <h2 className="mt-6 text-sm font-semibold text-neutral-700">Live fleet status</h2>
+      <ul className="mt-3 grid gap-3 sm:grid-cols-3">
+        {projects.map((p) => (
+          <li key={p.id} className="flex flex-col gap-2 rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <ProjectAvatar project={p} className="h-8 w-8 text-sm" />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.name}</span>
+              <span className="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-xs text-neutral-600">
+                {p.identifier}
+              </span>
+            </div>
+            {p.live_url ? <HealthPill url={p.live_url} /> : <span className="text-xs text-neutral-500">No live URL set</span>}
+            <Link href={`/projects/${p.id}`} className="mt-auto inline-flex items-center gap-1 text-xs font-medium text-red-600 hover:underline">
+              Open project <ArrowRight className="h-3 w-3" aria-hidden />
+            </Link>
+          </li>
+        ))}
+      </ul>
+
+      <Stats items={all} projectId={null} />
+
+      <h2 className="mt-8 text-sm font-semibold text-neutral-700">Unified priority queue</h2>
+      {queue.length === 0 ? (
+        <div className="mt-3 flex flex-col items-center rounded-lg border border-dashed border-neutral-300 px-6 py-10 text-center">
+          <Inbox className="h-8 w-8 text-neutral-400" aria-hidden />
+          <p className="mt-3 text-base font-medium">Nothing open across your projects</p>
+        </div>
+      ) : (
+        <ul className="mt-3 divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+          {queue.map(({ project, item }) => {
+            const status = statusOptions.find((s) => s.value === item.status)!;
+            const priority = priorityOptions.find((p) => p.value === item.priority)!;
+            return (
+              <li key={`${project.id}:${item.id}`}>
+                <Link
+                  href={`/projects/${project.id}/work-items`}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 hover:bg-neutral-50"
+                >
+                  <ProjectAvatar project={project} className="h-5 w-5 text-[10px]" />
+                  <span className="w-20 shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-center font-mono text-xs text-neutral-600">
+                    {workItemKey(project.id, item.seq)}
+                  </span>
+                  <span className="min-w-48 flex-1 truncate text-sm">{item.title}</span>
+                  <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${status.tone}`}>{status.label}</span>
+                  <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${priority.tone}`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${priority.dot}`} aria-hidden />
+                    {priority.label}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </>
+  );
+}
+
 export default function HomeDashboard() {
   const { displayName } = useProfile();
   const { current } = useWorkspaces();
   const { projects } = useProjects();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  // The picked project, else the main one; falls back if the picked project was deleted.
-  const selected = projects.find((p) => p.id === selectedId) ?? projects.find((p) => p.id === SEED_PROJECT.id) ?? projects[0] ?? SEED_PROJECT;
+  const mounted = useIsClient();
+  const [selectedId, setSelectedId] = useState("all");
+  const picked = projects.find((p) => p.id === selectedId);
+  // "all" (the default) is the portfolio view; it is also the fallback if the picked project was deleted.
+  const portfolio = !picked;
+  const selected = picked ?? projects.find((p) => p.id === SEED_PROJECT.id) ?? projects[0] ?? SEED_PROJECT;
   const workspaceName = current?.name ?? mockWorkspace.name;
 
   return (
@@ -129,10 +211,11 @@ export default function HomeDashboard() {
           <label className="flex items-center gap-2 text-sm text-neutral-600">
             Project
             <select
-              value={selected.id}
+              value={portfolio ? "all" : selected.id}
               onChange={(e) => setSelectedId(e.target.value)}
               className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
             >
+              <option value="all">All Projects (Portfolio View)</option>
               {projects.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -143,48 +226,54 @@ export default function HomeDashboard() {
         )}
       </div>
 
-      <LiveWorkItems projectId={selected.id} fallback={<div className="mt-6 h-96" />}>
-        {(items, error) => (
-          <>
-            {error && (
-              <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-                {error}
-              </p>
+      {portfolio ? (
+        mounted ? <Portfolio projects={projects} /> : <div className="mt-6 h-96" />
+      ) : (
+        <>
+          <LiveWorkItems projectId={selected.id} fallback={<div className="mt-6 h-96" />}>
+            {(items, error) => (
+              <>
+                {error && (
+                  <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {error}
+                  </p>
+                )}
+                <Stats items={items} projectId={selected.id} />
+
+                <h2 className="mt-8 text-sm font-semibold text-neutral-700">Active project</h2>
+                <div className="mt-3">
+                  <ProjectCard project={selected} items={items} />
+                </div>
+
+                <h2 className="mt-8 text-sm font-semibold text-neutral-700">Your work items</h2>
+                <div className="mt-3">
+                  <WorkList items={items} project={selected} />
+                </div>
+              </>
             )}
-            <Stats items={items} projectId={selected.id} />
+          </LiveWorkItems>
 
-            <h2 className="mt-8 text-sm font-semibold text-neutral-700">Active project</h2>
-            <div className="mt-3">
-              <ProjectCard project={selected} items={items} />
-            </div>
-
-            <h2 className="mt-8 text-sm font-semibold text-neutral-700">Your work items</h2>
-            <div className="mt-3">
-              <WorkList items={items} project={selected} />
-            </div>
-          </>
-        )}
-      </LiveWorkItems>
-
-      <h2 className="mt-8 text-sm font-semibold text-neutral-700">Quick launchpad</h2>
-      <div className="mt-3 grid gap-4 sm:grid-cols-2">
-        {launchpad(selected.id).map(({ href, title, body, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className="group flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-600">
-              <Icon className="h-5 w-5" aria-hidden />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium">{title}</span>
-              <span className="block text-xs text-neutral-500">{body}</span>
-            </span>
-            <ArrowRight className="h-4 w-4 text-neutral-400 group-hover:text-red-600" aria-hidden />
-          </Link>
-        ))}
-      </div>
+          <h2 className="mt-8 text-sm font-semibold text-neutral-700">Quick launchpad</h2>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            {launchpad(selected.id).map(({ href, title, body, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="group flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm hover:border-red-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-600">
+                  <Icon className="h-5 w-5" aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">{title}</span>
+                  <span className="block text-xs text-neutral-500">{body}</span>
+                </span>
+                <ArrowRight className="h-4 w-4 text-neutral-400 group-hover:text-red-600" aria-hidden />
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

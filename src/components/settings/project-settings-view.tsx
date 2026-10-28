@@ -7,7 +7,9 @@ import { BookOpen, Bug, CheckSquare, Plus, Sparkles, TrendingUp, type LucideIcon
 import LiveWorkItems from "@/components/home/live-work-items";
 import ProjectAvatar from "@/components/project-avatar";
 import { priorityOptions, statusOptions } from "@/components/work-items/work-items-view";
+import { logActivity } from "@/lib/activity-log";
 import { useAuth } from "@/lib/auth-context";
+import { getWebhookUrl, sendWebhookAlert, setWebhookUrl } from "@/lib/webhook";
 import { fetchMembers, type Member } from "@/lib/members";
 import { initials, mockUser } from "@/lib/mock-data";
 import type { ProjectRecord } from "@/lib/projects";
@@ -39,6 +41,88 @@ const isHttpUrl = (value: string) => {
     return false;
   }
 };
+
+// The URL stays in this browser only; the server route just relays alerts to Discord or Slack.
+function WebhookAlerts({ project }: { project: ProjectRecord }) {
+  const [url, setUrl] = useState(() => getWebhookUrl(project.id));
+  const [saved, setSaved] = useState(url);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const save = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const next = url.trim();
+    if (next && !/^https:\/\/(discord(app)?\.com|hooks\.slack\.com)\//i.test(next)) {
+      return setMessage({ ok: false, text: "Use an https Discord (discord.com) or Slack (hooks.slack.com) webhook URL." });
+    }
+    setWebhookUrl(project.id, next);
+    setUrl(next);
+    setSaved(next);
+    setMessage({ ok: true, text: next ? "Webhook saved on this device." : "Webhook removed." });
+  };
+
+  const test = async () => {
+    setSending(true);
+    setMessage(null);
+    const error = await sendWebhookAlert({
+      webhookUrl: saved,
+      projectName: project.name,
+      title: "Test alert",
+      message: "Webhook alerts are connected. You will be notified here when production goes down.",
+      state: "info",
+    });
+    setSending(false);
+    logActivity({
+      kind: "webhook",
+      title: error ? "Test alert failed" : "Test alert sent",
+      detail: error ?? project.name,
+    });
+    setMessage(error ? { ok: false, text: error } : { ok: true, text: "Test alert sent. Check your channel." });
+  };
+
+  return (
+    <div className="max-w-lg rounded-lg border border-neutral-200 p-4">
+      <h3 className="text-sm font-semibold">Webhook Alerts (Discord / Slack)</h3>
+      <p className="mt-1 text-sm text-neutral-500">
+        Get a message in your channel when this project&apos;s production URL stops responding.
+      </p>
+      <form onSubmit={save} className="mt-3 space-y-2">
+        <label htmlFor="ps-webhook" className="block text-xs font-medium text-neutral-600">
+          Webhook URL
+        </label>
+        <input
+          id="ps-webhook"
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="https://discord.com/api/webhooks/…"
+          className={fieldClass}
+        />
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
+            Save webhook
+          </button>
+          <button
+            type="button"
+            onClick={() => void test()}
+            disabled={!saved || sending}
+            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+          >
+            {sending ? "Sending…" : "Send Test Alert"}
+          </button>
+        </div>
+        {message && (
+          <p
+            role={message.ok ? "status" : "alert"}
+            className={`rounded-md px-2.5 py-1.5 text-sm ${message.ok ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"}`}
+          >
+            {message.text}
+          </p>
+        )}
+      </form>
+    </div>
+  );
+}
 
 function General({ project }: { project: ProjectRecord }) {
   const router = useRouter();
@@ -117,6 +201,8 @@ function General({ project }: { project: ProjectRecord }) {
           </button>
         </div>
       </form>
+
+      <WebhookAlerts key={project.id} project={project} />
 
       <div className="max-w-lg rounded-lg border border-red-200 p-4">
         <h3 className="text-sm font-semibold text-red-700">Danger zone</h3>

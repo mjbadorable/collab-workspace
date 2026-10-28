@@ -29,6 +29,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
+import ActivityBell from "@/components/activity-bell";
 import PokeballIcon from "@/components/pokeball-icon";
 import ProjectAvatar from "@/components/project-avatar";
 import Avatar from "@/components/settings/avatar";
@@ -93,7 +94,8 @@ export default function Sidebar({
   return (
     <div className="flex h-full w-64 flex-col border-r border-neutral-200 bg-neutral-50">
       <div className="space-y-2 p-3">
-        <div className="relative">
+        <div className="flex items-center gap-1">
+        <div className="relative min-w-0 flex-1">
           <button
             type="button"
             aria-haspopup="menu"
@@ -170,6 +172,8 @@ export default function Sidebar({
               )}
             </div>
           )}
+        </div>
+        <ActivityBell />
         </div>
 
         <button

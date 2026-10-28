@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from
 import { useRouter } from "next/navigation";
 import { GitFork, Loader2, Sparkles } from "lucide-react";
 import PokeballIcon from "@/components/pokeball-icon";
+import { logActivity } from "@/lib/activity-log";
 import { useAuth } from "@/lib/auth-context";
 import { ensureCloudProject } from "@/lib/cloud-projects";
 import { normalizeIdentifier, suggestIdentifier } from "@/lib/identifier";
@@ -124,6 +125,8 @@ function CreateForm({ onClose }: { onClose: () => void }) {
       lead: lead || null,
       ...stack,
     });
+
+    logActivity({ kind: "project", title: "Project created", detail: `${project.name} (${project.identifier})` });
 
     // Pre-populate the Kanban board with the tasks discovered in the README.
     if (drafts.length > 0) {

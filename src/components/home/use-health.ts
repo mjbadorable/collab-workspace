@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { logActivity } from "@/lib/activity-log";
+import { getProjects } from "@/lib/projects";
+import { getWebhookUrl, sendWebhookAlert } from "@/lib/webhook";
 
 export type Health =
   | { state: "none" }
@@ -73,6 +76,33 @@ function subscribeHistory(callback: () => void) {
   };
 }
 
+const ALERT_GAP_MS = 5 * 60_000;
+
+// An unreachable endpoint is logged to the activity feed and, if the project has a webhook, sent there too.
+// Once per URL per 5 minutes, however many components or tabs are checking it.
+function reportOffline(url: string) {
+  const key = `collab-workspace:health-alert:${url}`;
+  try {
+    const last = Number(localStorage.getItem(key)) || 0;
+    if (Date.now() - last < ALERT_GAP_MS) return;
+    localStorage.setItem(key, String(Date.now()));
+  } catch {
+    return; // without storage the limit cannot hold, so do not alert on every check
+  }
+  logActivity({ kind: "health", title: "Production endpoint unreachable", detail: url });
+  const project = getProjects().find((p) => p.live_url === url);
+  const webhookUrl = project ? getWebhookUrl(project.id) : "";
+  if (project && webhookUrl) {
+    void sendWebhookAlert({
+      webhookUrl,
+      projectName: project.name,
+      title: "Production endpoint unreachable",
+      message: `${url} did not respond to the latest health check.`,
+      state: "offline",
+    });
+  }
+}
+
 type Result = { key: string; health: Health };
 
 // Pings /api/health-check for a project's live URL. Re-checks when the URL changes or recheck() is called.
@@ -99,6 +129,7 @@ export function useHealth(url: string): {
       .then((r) => r.json())
       .then((d: { ok: boolean; status: number; latencyMs: number }) => {
         appendSample(url, { ts: Date.now(), ok: d.ok, status: d.ok ? d.status : 0, latencyMs: d.ok ? d.latencyMs : 0 });
+        if (!d.ok) reportOffline(url);
         setResult({
           key,
           health: d.ok ? { state: "online", status: d.status, latencyMs: d.latencyMs } : { state: "offline" },
@@ -107,6 +138,7 @@ export function useHealth(url: string): {
       .catch(() => {
         if (controller.signal.aborted) return;
         appendSample(url, { ts: Date.now(), ok: false, status: 0, latencyMs: 0 });
+        reportOffline(url);
         setResult({ key, health: { state: "offline" } });
       });
     return () => controller.abort();
