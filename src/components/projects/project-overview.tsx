@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Circle, Diamond, ExternalLink, GitFork, Square, type LucideIcon } from "lucide-react";
+import { ArrowRight, Circle, Diamond, ExternalLink, FileDown, GitFork, Square, type LucideIcon } from "lucide-react";
 import HealthPill from "@/components/home/health-pill";
 import LiveWorkItems from "@/components/home/live-work-items";
 import { progressOf } from "@/components/home/project-card";
+import ExportReportDialog from "@/components/projects/export-report-dialog";
 import GithubActivity from "@/components/projects/github-activity";
 import { getFlow } from "@/lib/diagram-storage";
 import { techRows } from "@/lib/project-stack";
@@ -118,6 +120,7 @@ function FlowchartPipeline({ projectId }: { projectId: string }) {
 export default function ProjectOverview({ projectId }: { projectId: string }) {
   const mounted = useIsClient();
   const { projects } = useProjects();
+  const [exporting, setExporting] = useState(false);
   const project = projects.find((p) => p.id === projectId);
 
   if (!mounted) return <div className="h-full" />;
@@ -164,6 +167,9 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
               <ExternalLink className="h-3.5 w-3.5" aria-hidden /> Live App
             </a>
           )}
+          <button type="button" onClick={() => setExporting(true)} className={linkClass}>
+            <FileDown className="h-3.5 w-3.5" aria-hidden /> Export Report
+          </button>
         </div>
       </header>
 
@@ -262,6 +268,8 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
           <p className="mt-1 text-neutral-500">{diagrams.map((d) => d.name).join(", ")}</p>
         </SectionCard>
       </section>
+
+      <ExportReportDialog project={project} open={exporting} onClose={() => setExporting(false)} />
     </div>
   );
 }

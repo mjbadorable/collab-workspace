@@ -12,6 +12,48 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Printing the export dialog: only the report (.print-area) is shown, as a plain white document. */
+@media print {
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible !important;
+  }
+  dialog.report-dialog {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  dialog.report-dialog::backdrop {
+    display: none;
+  }
+  dialog.report-dialog > div,
+  .print-area {
+    max-height: none !important;
+    overflow: visible !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

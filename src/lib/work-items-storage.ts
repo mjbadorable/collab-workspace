@@ -54,7 +54,7 @@ function seedItems(projectId: string): StoredWorkItem[] {
       seed(1, "Real-time Supabase Realtime channel listener for multi-user Kanban sync", "done", "high", mockUser.id),
       seed(2, "Automated GitHub commit and pull request activity widget in project overview", "done", "medium", mockUser.id),
       seed(3, "Workspace-level member role permissions (Admin vs Member granular gates)", "done", "medium", mockUser.id),
-      seed(4, "Export project telemetry and architecture blueprint as printable PDF report", "backlog", "low", null),
+      seed(4, "Export project telemetry and architecture blueprint as printable PDF report", "done", "low", mockUser.id),
       seed(5, "Plug & Play GitHub repo breakdown and auto-task generation", "done", "high", mockUser.id),
     ];
   }
