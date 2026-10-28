@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Plus, RefreshCw } from "lucide-react";
 import { parseDescription, serializeDescription } from "@/lib/checklist";
 import {
+  computeBurndownData,
   createCycle,
   daysRemaining,
   formatRange,
@@ -74,6 +75,66 @@ function ProgressBar({ items }: { items: StoredWorkItem[] }) {
       <p className="mt-1 text-xs text-neutral-500">
         {done}/{total} tasks completed · {percent}%
       </p>
+    </div>
+  );
+}
+
+const CHART = { w: 500, h: 180, left: 34, right: 16, top: 12, bottom: 28 };
+
+// Pure-SVG sprint burndown: the dashed line is the ideal pace, the solid line is what was really left each day.
+function Burndown({ cycle, items, cycles }: { cycle: Cycle; items: StoredWorkItem[]; cycles: Cycle[] }) {
+  const { total, days } = computeBurndownData(cycle, items, cycles);
+  if (total === 0) return <p className="mt-4 text-sm text-neutral-500">Add tasks to this cycle to see its burndown.</p>;
+
+  const plotW = CHART.w - CHART.left - CHART.right;
+  const plotH = CHART.h - CHART.top - CHART.bottom;
+  const x = (i: number) => CHART.left + (days.length > 1 ? (i / (days.length - 1)) * plotW : plotW / 2);
+  const y = (v: number) => CHART.top + plotH - (v / total) * plotH;
+  const points = (values: (number | null)[]) =>
+    values.flatMap((v, i) => (v === null ? [] : [`${x(i).toFixed(1)},${y(v).toFixed(1)}`])).join(" ");
+  const actual = days.filter((d) => d.actual !== null);
+
+  return (
+    <div className="mt-5 max-w-xl">
+      <svg viewBox={`0 0 ${CHART.w} ${CHART.h}`} role="img" aria-label={`Sprint burndown for ${cycle.name}`} className="h-auto w-full">
+        <line x1={CHART.left} y1={y(0)} x2={CHART.w - CHART.right} y2={y(0)} className="stroke-neutral-200" />
+        <line x1={CHART.left} y1={y(total)} x2={CHART.w - CHART.right} y2={y(total)} className="stroke-neutral-200" strokeDasharray="2 4" />
+        <text x={CHART.left - 6} y={y(total) + 4} textAnchor="end" className="fill-neutral-500 text-[10px]">
+          {total}
+        </text>
+        <text x={CHART.left - 6} y={y(0) + 4} textAnchor="end" className="fill-neutral-500 text-[10px]">
+          0
+        </text>
+        {[0, Math.floor((days.length - 1) / 2), days.length - 1].map((i, n) => (
+          <text key={`${i}-${n}`} x={x(i)} y={CHART.h - 8} textAnchor={n === 0 ? "start" : n === 2 ? "end" : "middle"} className="fill-neutral-500 text-[10px]">
+            Day {days[i].day}
+          </text>
+        ))}
+        <polyline fill="none" strokeWidth="2" strokeDasharray="6 5" points={points(days.map((d) => d.ideal))} className="stroke-neutral-400" />
+        <polyline fill="none" strokeWidth="2.5" points={points(days.map((d) => d.actual))} className="stroke-emerald-500" />
+        {days.map((d, i) =>
+          d.actual === null ? null : (
+            <circle key={d.date} cx={x(i)} cy={y(d.actual)} r="4" strokeWidth="1.5" className="fill-emerald-500 stroke-white">
+              <title>{`Day ${d.day}: ${d.actual} ${d.actual === 1 ? "task" : "tasks"} remaining`}</title>
+            </circle>
+          )
+        )}
+      </svg>
+      <ul className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-600">
+        <li className="flex items-center gap-2">
+          <svg width="22" height="6" aria-hidden>
+            <line x1="0" y1="3" x2="22" y2="3" strokeWidth="2" strokeDasharray="5 4" className="stroke-neutral-400" />
+          </svg>
+          Ideal Guideline (dashed)
+        </li>
+        <li className="flex items-center gap-2">
+          <svg width="22" height="6" aria-hidden>
+            <line x1="0" y1="3" x2="22" y2="3" strokeWidth="2.5" className="stroke-emerald-500" />
+          </svg>
+          Actual Remaining (solid)
+        </li>
+      </ul>
+      {actual.length === 0 && <p className="mt-1 text-xs text-neutral-500">This cycle has not started yet.</p>}
     </div>
   );
 }
@@ -272,6 +333,7 @@ function Planner({ projectId, api }: { projectId: string; api: Api }) {
           <div className="mt-4 max-w-md">
             <ProgressBar items={itemsOf(active)} />
           </div>
+          <Burndown cycle={active} items={live} cycles={cycles} />
           {adding && (
             <form onSubmit={addTask} className="mt-4 flex max-w-md gap-2">
               <label htmlFor="cy-task" className="sr-only">Task title</label>

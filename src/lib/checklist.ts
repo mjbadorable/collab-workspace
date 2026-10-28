@@ -11,6 +11,7 @@ export type DescriptionMeta = {
   dueDate?: string | null;
   cycle?: string | null;
   module?: string | null;
+  completedDate?: string | null; // YYYY-MM-DD, stamped when the item moves to done
   commit?: string | null; // hex SHA, 7 to 40 characters
   pr?: string | null; // pull request number, digits only
 };
@@ -20,6 +21,7 @@ const LABEL_LINE = /^\[label:\s*(Feature|Bug|Architecture|DevOps|UX)\]$/;
 const DUE_LINE = /^\[due:\s*(\d{4}-\d{2}-\d{2})\]$/;
 const CYCLE_LINE = /^\[cycle:\s*(.+)\]$/;
 const MODULE_LINE = /^\[module:\s*(.+)\]$/;
+const COMPLETED_LINE = /^\[completed:\s*(\d{4}-\d{2}-\d{2})\]$/;
 const COMMIT_LINE = /^\[commit:\s*([a-f0-9]{7,40})\]$/i;
 const PR_LINE = /^\[pr:\s*#?(\d+)\]$/i;
 
@@ -56,6 +58,7 @@ export function parseDescription(description: string | null): {
   module: string | null;
   commit: string | null;
   pr: string | null;
+  completedDate: string | null;
 } {
   const tasks: SubTask[] = [];
   const notes: string[] = [];
@@ -65,6 +68,7 @@ export function parseDescription(description: string | null): {
   let moduleName: string | null = null;
   let commit: string | null = null;
   let pr: string | null = null;
+  let completedDate: string | null = null;
   for (const line of (description ?? "").split(/\r?\n/)) {
     const trimmed = line.trim();
     const task = line.match(TASK_LINE);
@@ -74,6 +78,7 @@ export function parseDescription(description: string | null): {
     const moduleMatch = trimmed.match(MODULE_LINE);
     const commitMatch = trimmed.match(COMMIT_LINE);
     const prMatch = trimmed.match(PR_LINE);
+    const completedMatch = trimmed.match(COMPLETED_LINE);
     if (task) tasks.push({ text: task[2], done: task[1] !== " " });
     else if (labelMatch && isLabel(labelMatch[1])) label = labelMatch[1];
     else if (dueMatch) dueDate = dueMatch[1];
@@ -81,9 +86,10 @@ export function parseDescription(description: string | null): {
     else if (moduleMatch) moduleName = moduleMatch[1].trim();
     else if (commitMatch) commit = commitMatch[1].toLowerCase();
     else if (prMatch) pr = prMatch[1];
+    else if (completedMatch) completedDate = completedMatch[1];
     else notes.push(line);
   }
-  return { notes: notes.join("\n").trim(), tasks, label, dueDate, cycle, module: moduleName, commit, pr };
+  return { notes: notes.join("\n").trim(), tasks, label, dueDate, cycle, module: moduleName, commit, pr, completedDate };
 }
 
 // The inverse of parseDescription; null when there is nothing to store.
@@ -96,9 +102,29 @@ export function serializeDescription(notes: string, tasks: SubTask[], meta: Desc
     meta.module ? `[module: ${cleanMetaName(meta.module)}]` : "",
     meta.commit && COMMIT_PATTERN.test(meta.commit) ? `[commit: ${meta.commit.toLowerCase()}]` : "",
     meta.pr && PR_PATTERN.test(meta.pr) ? `[pr: ${meta.pr.replace("#", "")}]` : "",
+    meta.completedDate && /^\d{4}-\d{2}-\d{2}$/.test(meta.completedDate) ? `[completed: ${meta.completedDate}]` : "",
   ].filter(Boolean);
   const text = [notes.trim(), lines.join("\n"), metaLines.join("\n")].filter(Boolean).join("\n\n");
   return text || null;
+}
+
+// Today as YYYY-MM-DD in the user's own timezone (a UTC date would be a day off for part of the day).
+export function localDateIso(date = new Date()): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+// Sets (or, with null, clears) the [completed: date] stamp and keeps everything else in the description.
+export function withCompletedDate(description: string | null, date: string | null): string | null {
+  const p = parseDescription(description);
+  return serializeDescription(p.notes, p.tasks, {
+    label: p.label,
+    dueDate: p.dueDate,
+    cycle: p.cycle,
+    module: p.module,
+    commit: p.commit,
+    pr: p.pr,
+    completedDate: date,
+  });
 }
 
 export function taskProgress(tasks: SubTask[]): { done: number; total: number; percent: number } {

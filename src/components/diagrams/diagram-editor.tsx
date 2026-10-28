@@ -19,13 +19,17 @@ import {
   type NodeProps,
   type NodeTypes,
 } from "@xyflow/react";
-import { Check, Code2, Copy, Maximize2 } from "lucide-react";
+import { Check, Code2, Copy, Maximize2, Pencil } from "lucide-react";
+import FlowStepsDialog from "./flow-steps-dialog";
 import { ProjectNotFound } from "@/components/projects/project-overview";
 import {
   flowCategories,
   getFlow,
   getMermaidForCategory,
+  hasCustomFlow,
   parseFlowCategory,
+  resetCustomFlow,
+  saveCustomFlow,
   type FlowCategory,
   type FlowStep,
   type FlowStepKind,
@@ -151,8 +155,13 @@ function SequenceCard({ step, index, active, onSelect }: { step: FlowStep; index
 
 function Viewer({ projectId, projectName, category }: { projectId: string; projectName: string; category: FlowCategory }) {
   const { fitView } = useReactFlow();
-  const flow = useMemo(() => getFlow(projectId, category), [projectId, category]);
-  const mermaid = useMemo(() => getMermaidForCategory(projectId, category), [projectId, category]);
+  // Bumped after the steps are edited, so the canvas, the cards and the Mermaid code are read again.
+  const [version, setVersion] = useState(0);
+  const [editing, setEditing] = useState(false);
+  /* eslint-disable react-hooks/exhaustive-deps -- `version` is not read inside; a new value means the saved flow changed */
+  const flow = useMemo(() => getFlow(projectId, category), [projectId, category, version]);
+  const mermaid = useMemo(() => getMermaidForCategory(projectId, category), [projectId, category, version]);
+  /* eslint-enable react-hooks/exhaustive-deps */
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
   const [inspectedId, setInspectedId] = useState<string | null>(null);
@@ -182,6 +191,11 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
       })),
     [flow]
   );
+
+  // Bring the new layout into view once an edit has been saved.
+  useEffect(() => {
+    if (version > 0) void fitView({ duration: 300, padding: 0.2 });
+  }, [version, fitView]);
 
   // Clicking a step (card or node) opens its runbook so edge cases can be documented on the flow itself.
   const inspect = (id: string) => setInspectedId(id);
@@ -218,6 +232,13 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
             className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-neutral-700 hover:bg-neutral-100"
           >
             <Maximize2 className="h-4 w-4" aria-hidden /> Fit to View
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-neutral-700 hover:bg-neutral-100"
+          >
+            <Pencil className="h-4 w-4" aria-hidden /> Edit Steps
           </button>
           <button
             type="button"
@@ -302,6 +323,21 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
           onClose={() => setInspectedId(null)}
         />
       )}
+
+      <FlowStepsDialog
+        open={editing}
+        onClose={() => setEditing(false)}
+        steps={flow.steps}
+        isCustom={hasCustomFlow(projectId, category)}
+        onSave={(steps) => {
+          saveCustomFlow(projectId, category, steps);
+          setVersion((v) => v + 1);
+        }}
+        onReset={() => {
+          resetCustomFlow(projectId, category);
+          setVersion((v) => v + 1);
+        }}
+      />
 
       <MermaidDialog open={showCode} onClose={() => setShowCode(false)} code={mermaid} />
     </div>

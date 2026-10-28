@@ -84,6 +84,10 @@ body {
   html.dark .divide-neutral-200 > :not(:last-child) { border-color: #1f2937; }
   html.dark .ring-neutral-200 { --tw-ring-color: #374151; }
   html.dark .fill-neutral-900 { fill: #f3f4f6; }
+  html.dark .fill-neutral-500 { fill: #9ca3af; }
+  html.dark .stroke-neutral-200 { stroke: #374151; }
+  html.dark .stroke-neutral-400 { stroke: #9ca3af; }
+  html.dark .stroke-white { stroke: #111827; }
   html.dark .stroke-neutral-100 { stroke: #1f2937; }
   html.dark .stroke-neutral-300 { stroke: #4b5563; }
 

@@ -241,7 +241,57 @@ function genericSteps(project: ProjectRecord, category: FlowCategory): Omit<Flow
   ];
 }
 
+// ---- custom flows: a project's edited steps replace the built-in ones for that category
+
+const customFlowKey = (projectId: string, category: FlowCategory) => `collab-workspace:custom-flow:${projectId}:${category}`;
+const KINDS: FlowStepKind[] = ["terminal", "process", "decision"];
+
+const isFlowStep = (v: unknown): v is FlowStep => {
+  if (typeof v !== "object" || v === null) return false;
+  const s = v as FlowStep;
+  return (
+    typeof s.id === "string" &&
+    typeof s.label === "string" &&
+    KINDS.includes(s.kind) &&
+    typeof s.role === "string" &&
+    typeof s.payload === "string"
+  );
+};
+
+function readCustomFlow(projectId: string, category: FlowCategory): FlowStep[] | null {
+  try {
+    const raw = localStorage.getItem(customFlowKey(projectId, category));
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(isFlowStep)) return parsed;
+  } catch {
+    // corrupt JSON or storage blocked: use the built-in flow
+  }
+  return null;
+}
+
+export const hasCustomFlow = (projectId: string, category: FlowCategory) => readCustomFlow(projectId, category) !== null;
+
+// Step ids are kept as given (they key runbook notes and Mermaid nodes), so reordering a step never moves its notes.
+export function saveCustomFlow(projectId: string, category: FlowCategory, steps: FlowStep[]): void {
+  try {
+    localStorage.setItem(customFlowKey(projectId, category), JSON.stringify(steps));
+  } catch {
+    // storage blocked: the edit lasts until the page is reloaded
+  }
+}
+
+export function resetCustomFlow(projectId: string, category: FlowCategory): void {
+  try {
+    localStorage.removeItem(customFlowKey(projectId, category));
+  } catch {
+    // nothing stored to remove
+  }
+}
+
 export function getFlow(projectId: string, category: FlowCategory): Flow {
+  const custom = readCustomFlow(projectId, category);
+  if (custom) return { category, ...meta[category], steps: custom };
   const project = getProjects().find((p) => p.id === projectId);
   const handWritten =
     projectId === "exam-reviewer-app"

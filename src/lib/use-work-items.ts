@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { logActivity } from "./activity-log";
+import { localDateIso, withCompletedDate } from "./checklist";
 import type { WorkItem } from "./database.types";
 import { ensureCloudProject } from "./cloud-projects";
 import {
@@ -111,6 +112,7 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
   // Ids of items another user just changed; they clear themselves after FLASH_MS.
   const [remoteUpdatedIds, setRemoteUpdatedIds] = useState<ReadonlySet<string>>(new Set());
   const projectUuid = useRef<string | null>(null);
+  const cloudSynced = useRef(false);
   const itemsRef = useRef(items);
   const viewerRef = useRef(viewer);
   const flashTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
@@ -147,8 +149,11 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
     }
   }, []);
 
+  // Local preview saves every change. Signed in, the cloud copy is mirrored to the same local key as a read cache
+  // (the command palette, the portfolio view and the node inspector read it), but only after a successful fetch,
+  // so a failed load can never overwrite the cache with an empty list.
   useEffect(() => {
-    if (!workspaceId && items) saveWorkItems(projectId, items);
+    if (items && (!workspaceId || cloudSynced.current)) saveWorkItems(projectId, items);
   }, [workspaceId, projectId, items]);
 
   // Local preview: another tab saved this project's items.
@@ -164,11 +169,14 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
   const reload = useCallback(async () => {
     if (!projectUuid.current) return;
     try {
-      setItems(await fetchCloudWorkItems(projectUuid.current));
+      const rows = await fetchCloudWorkItems(projectUuid.current);
+      cloudSynced.current = true;
+      saveWorkItems(projectId, rows);
+      setItems(rows);
     } catch (e) {
       setError(messageOf(e));
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -214,7 +222,11 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
         let rows = await fetchCloudWorkItems(pid);
         if (rows.length === 0) rows = await seedEmptyCloudProject(pid, projectId, rows, () => cancelled);
         else rows = await upgradeCollabCloudProject(pid, projectId, rows, () => cancelled);
-        if (!cancelled) setItems(rows);
+        if (!cancelled) {
+          cloudSynced.current = true;
+          saveWorkItems(projectId, rows);
+          setItems(rows);
+        }
       } catch (e) {
         if (!cancelled) {
           setError(messageOf(e));
@@ -231,7 +243,10 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
     };
   }, [workspaceId, projectId, flash, reload]);
 
-  const add = (input: NewWorkItemInput) => {
+  const add = (raw: NewWorkItemInput) => {
+    // An item created already done gets its completion date too.
+    const input: NewWorkItemInput =
+      raw.status === "done" ? { ...raw, description: withCompletedDate(raw.description, localDateIso()) ?? "" } : raw;
     logActivity({ kind: "task", title: "Work item created", detail: input.title.trim() });
     if (!workspaceId) {
       setItems((prev) => addWorkItem(prev ?? [], projectId, input));
@@ -249,10 +264,17 @@ export function useWorkItems(projectId: string, workspaceId: string | null, view
   };
 
   // Optimistic: the UI updates at once, and a failed write reloads the server's version.
-  const update = (id: string, patch: Partial<WorkItem>) => {
+  const update = (id: string, rawPatch: Partial<WorkItem>) => {
     const before = itemsRef.current?.find((i) => i.id === id);
-    if (before && patch.status === "done" && before.status !== "done") {
-      logActivity({ kind: "task", title: "Work item completed", detail: before.title });
+    let patch = rawPatch;
+    if (before && rawPatch.status !== undefined && (rawPatch.status === "done") !== (before.status === "done")) {
+      // Moving into done stamps today's date (the burndown chart reads it); moving out clears it.
+      const finished = rawPatch.status === "done";
+      patch = {
+        ...rawPatch,
+        description: withCompletedDate(rawPatch.description !== undefined ? rawPatch.description : before.description, finished ? localDateIso() : null),
+      };
+      if (finished) logActivity({ kind: "task", title: "Work item completed", detail: before.title });
     }
     setItems((prev) => prev && updateWorkItem(prev, id, patch));
     if (!workspaceId) return;

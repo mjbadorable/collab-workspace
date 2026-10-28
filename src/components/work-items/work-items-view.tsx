@@ -500,6 +500,7 @@ function BoardCard({
         module: parsed.module,
         commit: parsed.commit,
         pr: parsed.pr,
+        completedDate: parsed.completedDate,
       }),
     });
   };
@@ -769,6 +770,8 @@ function ItemForm({
           module: String(f.get("module") ?? "") || null,
           commit: String(f.get("commit") ?? "").trim() || null,
           pr: String(f.get("pr") ?? "").trim() || null,
+          // Kept as is here; the status change itself stamps or clears it when the item is saved.
+          completedDate: initialParts.completedDate,
         }) ?? "",
       status: f.get("status") as WorkItemStatus,
       priority: f.get("priority") as WorkItemPriority,

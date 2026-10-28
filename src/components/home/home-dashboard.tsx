@@ -1,19 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock, Inbox, Landmark, ListTodo, Network, Plus } from "lucide-react";
 import Greeting from "@/components/greeting";
 import ProjectAvatar from "@/components/project-avatar";
 import { priorityOptions, statusOptions } from "@/components/work-items/work-items-view";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
+import { ensureCloudProject } from "@/lib/cloud-projects";
 import { mockWorkspace } from "@/lib/mock-data";
 import { useProfile } from "@/lib/profile-context";
 import { SEED_PROJECT, type ProjectRecord } from "@/lib/projects";
 import { useProjects } from "@/lib/projects-context";
 import { useWorkspaces } from "@/lib/workspace-context";
+import { useStorageTarget } from "@/lib/storage-target";
 import { useIsClient } from "@/lib/use-is-client";
-import { loadWorkItems, workItemKey, type StoredWorkItem } from "@/lib/work-items-storage";
+import {
+  fetchCloudWorkItemsForProjects,
+  loadWorkItems,
+  saveWorkItems,
+  workItemKey,
+  type StoredWorkItem,
+} from "@/lib/work-items-storage";
 import HealthPill from "./health-pill";
 import LiveWorkItems from "./live-work-items";
 import ProjectCard from "./project-card";
@@ -119,10 +127,39 @@ const PRIORITY_RANK: Record<StoredWorkItem["priority"], number> = { high: 0, med
 const QUEUE_SIZE = 8;
 
 // Every project at a glance. Work items come from each project's local board, so this only mounts on the client.
-function Portfolio({ projects }: { projects: ProjectRecord[] }) {
+function Portfolio({ projects, workspaceId }: { projects: ProjectRecord[]; workspaceId: string | null }) {
+  // Bumped after the cloud copy has been mirrored into localStorage, so the boards below are read again.
+  const [syncedAt, setSyncedAt] = useState(0);
+
+  // Signed in: pull every project's work items from Supabase and mirror them to the local cache this view reads.
+  // A project with no cloud items yet is left alone (its board is seeded the first time it is opened).
+  useEffect(() => {
+    if (!workspaceId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const uuids = await Promise.all(projects.map((p) => ensureCloudProject(workspaceId, p.id)));
+        const rows = await fetchCloudWorkItemsForProjects(uuids);
+        if (cancelled) return;
+        projects.forEach((p, i) => {
+          const mine = rows.filter((r) => r.project_id === uuids[i]);
+          if (mine.length > 0) saveWorkItems(p.id, mine);
+        });
+        setSyncedAt(Date.now());
+      } catch {
+        // offline or not allowed: the last local copy stays on screen
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, projects]);
+
   const boards = useMemo(
     () => projects.map((project) => ({ project, items: loadWorkItems(project.id).filter((i) => !i.deleted_at) })),
-    [projects]
+    // syncedAt is not read inside, but a new value means the local copy changed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [projects, syncedAt]
   );
   const all = boards.flatMap((b) => b.items);
   const queue = boards
@@ -195,6 +232,8 @@ export default function HomeDashboard() {
   const { current } = useWorkspaces();
   const { projects } = useProjects();
   const mounted = useIsClient();
+  const target = useStorageTarget();
+  const workspaceId = target.mode === "cloud" ? target.workspaceId : null;
   const [selectedId, setSelectedId] = useState("all");
   const picked = projects.find((p) => p.id === selectedId);
   // "all" (the default) is the portfolio view; it is also the fallback if the picked project was deleted.
@@ -227,7 +266,11 @@ export default function HomeDashboard() {
       </div>
 
       {portfolio ? (
-        mounted ? <Portfolio projects={projects} /> : <div className="mt-6 h-96" />
+        mounted && target.mode !== "loading" ? (
+          <Portfolio key={workspaceId ?? "local"} projects={projects} workspaceId={workspaceId} />
+        ) : (
+          <div className="mt-6 h-96" />
+        )
       ) : (
         <>
           <LiveWorkItems projectId={selected.id} fallback={<div className="mt-6 h-96" />}>

@@ -1,4 +1,5 @@
-import { cleanMetaName } from "./checklist";
+import { cleanMetaName, localDateIso, parseDescription } from "./checklist";
+import type { StoredWorkItem } from "./work-items-storage";
 
 export type CycleStatus = "active" | "upcoming" | "completed";
 
@@ -69,10 +70,7 @@ function save(projectId: string, cycles: Cycle[]): Cycle[] {
   return cycles;
 }
 
-const todayIso = () => {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
+const todayIso = () => localDateIso();
 
 export function createCycle(
   projectId: string,
@@ -110,6 +108,52 @@ export function daysRemaining(c: Cycle): number {
 export function formatRange(c: Cycle): string {
   const fmt = (iso: string) => parseDay(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return `${fmt(c.startDate)} – ${fmt(c.endDate)}`;
+}
+
+export type BurndownDay = {
+  date: string;
+  day: number; // 1-based
+  ideal: number;
+  actual: number | null; // null for days that have not happened yet
+};
+
+const addDays = (iso: string, n: number) => {
+  const d = parseDay(iso);
+  d.setDate(d.getDate() + n);
+  return localDateIso(d);
+};
+
+// Day by day from the cycle's start to its end: the ideal line falls straight from the item count to 0, and the
+// actual line is what was still open at the end of each day that has already happened. An item counts as
+// finished on its [completed: date] stamp; a done item without one (finished before stamps existed) is
+// counted on the day it was created, kept within the cycle.
+export function computeBurndownData(
+  cycle: Cycle,
+  items: StoredWorkItem[],
+  allCycles: Cycle[] = [cycle]
+): { total: number; days: BurndownDay[] } {
+  const mine = items.filter(
+    (i) => !i.deleted_at && itemCycleId(allCycles, parseDescription(i.description).cycle, i.created_at) === cycle.id
+  );
+  const finishedOn = mine.flatMap((i) => {
+    if (i.status !== "done") return [];
+    return [parseDescription(i.description).completedDate ?? i.created_at.slice(0, 10)];
+  });
+
+  const total = mine.length;
+  const length = Math.max(1, Math.round((parseDay(cycle.endDate).getTime() - parseDay(cycle.startDate).getTime()) / 86_400_000) + 1);
+  const today = todayIso();
+  const days: BurndownDay[] = [];
+  for (let i = 0; i < length; i++) {
+    const date = addDays(cycle.startDate, i);
+    days.push({
+      date,
+      day: i + 1,
+      ideal: length > 1 ? total * (1 - i / (length - 1)) : 0,
+      actual: date <= today ? total - finishedOn.filter((d) => d <= date).length : null,
+    });
+  }
+  return { total, days };
 }
 
 // A work item belongs to the cycle it is tagged with ([cycle: name]); an untagged one falls into the cycle
