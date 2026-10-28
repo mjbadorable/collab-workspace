@@ -142,6 +142,10 @@ collab-workspace/
 | `CW-30` | Pokédex Dossier 5-axis technical radar and fleet technology matrix | Done | Medium |
 | `CW-31` | Daily Standup & Executive Digest Generator on Home Dashboard | Done | Medium |
 | `CW-32` | Global Keyboard Shortcut Cheat-sheet (?) and milestone celebration burst | Done | Low |
+| `CW-33` | Two-row sidebar trainer footer so the display name and role badge are never cramped | Done | Medium |
+| `CW-34` | Collapsible Workspace Roadmap grid showing the six newest milestones | Done | Low |
+| `CW-35` | Collapsible desktop sidebar toggle for full-width boards and diagrams | Done | Low |
+| `CW-36` | Label and Cycle filter dropdowns on the Work Items toolbar | Done | Medium |
 
 ---
 

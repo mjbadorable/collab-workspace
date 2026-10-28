@@ -327,29 +327,34 @@ export default function Sidebar({
         {loading ? (
           <div className="h-12" aria-hidden />
         ) : (
-          <div className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                onNavigate?.();
-                onEditProfile();
-              }}
-              aria-label="Edit profile"
-              className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
-            >
-              <Avatar url={profile.avatar_url} name={displayName} />
-            </button>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium" title={user?.email ?? undefined}>
-                {displayName}
-              </p>
-              <p className="flex items-center gap-1.5 truncate text-xs text-neutral-500">
-                <span className={`shrink-0 whitespace-nowrap rounded px-1 text-[10px] font-semibold uppercase ${roleTone(profile.role)}`}>
-                  {profile.role}
-                </span>
-                <span className="min-w-0 truncate">{user ? "Signed in" : "Local preview"} · Admin</span>
-              </p>
+          <div>
+            {/* Row 1: who you are. Nothing else shares this row, so the full name and role always fit. */}
+            <div className="flex items-center gap-2.5 px-1 py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onNavigate?.();
+                  onEditProfile();
+                }}
+                aria-label="Edit profile"
+                className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+              >
+                <Avatar url={profile.avatar_url} name={displayName} />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold" title={user?.email ?? displayName}>
+                  {displayName}
+                </p>
+                <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-neutral-500">
+                  <span className={`shrink-0 whitespace-nowrap rounded px-1 text-[10px] font-semibold uppercase ${roleTone(profile.role)}`}>
+                    {profile.role}
+                  </span>
+                  <span className="min-w-0 truncate">{user ? "Signed in" : "Local preview"} · Admin</span>
+                </p>
+              </div>
             </div>
+            {/* Row 2: quick utilities. */}
+            <div className="mt-2 grid grid-cols-4 gap-1 rounded-lg border border-neutral-200 bg-white p-1">
             <button
               type="button"
               onClick={() => {
@@ -358,7 +363,7 @@ export default function Sidebar({
               }}
               title="Edit profile"
               aria-label="Edit profile"
-              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+              className="flex items-center justify-center rounded py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -370,7 +375,7 @@ export default function Sidebar({
               }}
               title="Keyboard shortcuts (?)"
               aria-label="Keyboard shortcuts"
-              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+              className="flex items-center justify-center rounded py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
             >
               <Keyboard className="h-4 w-4" />
             </button>
@@ -379,7 +384,7 @@ export default function Sidebar({
               onClick={toggleTheme}
               title="Switch between Poké-Center Light and Silph Co. Dark"
               aria-label="Switch between Poké-Center Light and Silph Co. Dark"
-              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+              className="flex items-center justify-center rounded py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
             >
               {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
@@ -392,15 +397,16 @@ export default function Sidebar({
                 }}
                 title="Sign out"
                 aria-label="Sign out"
-                className="rounded p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+                className="flex items-center justify-center rounded py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
               >
                 <LogOut className="h-4 w-4" />
               </button>
             ) : (
-              <Link href="/login" onClick={onNavigate} className="text-xs font-medium text-red-600 hover:underline">
+              <Link href="/login" onClick={onNavigate} className="flex items-center justify-center rounded py-1 text-xs font-medium text-red-600 hover:bg-neutral-100">
                 Sign in
               </Link>
             )}
+            </div>
           </div>
         )}
       </div>

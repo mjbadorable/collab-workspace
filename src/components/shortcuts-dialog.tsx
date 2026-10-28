@@ -9,6 +9,7 @@ const GROUPS: { title: string; shortcuts: { keys: string[]; label: string }[] }[
     shortcuts: [
       { keys: ["Ctrl", "K"], label: "Command Palette (⌘K on Mac)" },
       { keys: ["?"], label: "Keyboard cheat-sheet" },
+      { keys: ["["], label: "Toggle sidebar" },
       { keys: ["Esc"], label: "Close dialogs and docks" },
     ],
   },

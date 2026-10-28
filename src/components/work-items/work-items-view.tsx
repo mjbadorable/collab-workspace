@@ -29,8 +29,9 @@ import {
   WORK_ITEM_LABELS,
   type SubTask,
   type TicketComment,
+  type WorkItemLabel,
 } from "@/lib/checklist";
-import { getCycles } from "@/lib/cycles";
+import { getCycles, itemCycleId } from "@/lib/cycles";
 import { initials, mockUser } from "@/lib/mock-data";
 import { startFocusTimer } from "@/lib/focus-timer";
 import { getModules } from "@/lib/modules";
@@ -1183,6 +1184,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     }
   }, []);
   const [query, setQuery] = useState("");
+  const [labelFilter, setLabelFilter] = useState<"all" | WorkItemLabel>("all");
+  const [cycleFilter, setCycleFilter] = useState("all");
   const [transferring, setTransferring] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -1216,7 +1219,8 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     .concat(workspaceId ? [] : [{ id: mockUser.id, name: mockUser.name, avatar_url: profile.avatar_url }]);
 
   // Cycle and module choices for the dialogs. WorkItems only renders on the client, so reading localStorage is safe.
-  const cycleNames = useMemo(() => getCycles(projectId).map((c) => c.name), [projectId]);
+  const cycles = useMemo(() => getCycles(projectId), [projectId]);
+  const cycleNames = useMemo(() => cycles.map((c) => c.name), [cycles]);
   const moduleNames = useMemo(() => getModules(projectId).map((m) => m.name), [projectId]);
 
   // Native <dialog> gives focus trapping, Esc-to-close and an inert page behind it.
@@ -1245,6 +1249,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
   const statusByKey = new Map(boardTickets.map((t) => [t.key, t.status] as const));
 
   const needle = query.trim().toLowerCase();
+  const filterCycle = cycleFilter === "all" ? null : (cycles.find((c) => c.name === cycleFilter) ?? null);
   const live = items
     .filter((i) => !i.deleted_at)
     .filter(
@@ -1254,7 +1259,22 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
         i.title.toLowerCase().includes(needle) ||
         parseDescription(i.description).notes.toLowerCase().includes(needle)
     )
+    .filter((i) => {
+      if (labelFilter === "all" && cycleFilter === "all") return true;
+      const p = parseDescription(i.description);
+      if (labelFilter !== "all" && p.label !== labelFilter) return false;
+      if (cycleFilter === "all") return true;
+      // Tagged items match by tag; untagged ones by the cycle that was running when they were created.
+      return p.cycle ? p.cycle === cycleFilter : filterCycle !== null && itemCycleId(cycles, null, i.created_at) === filterCycle.id;
+    })
     .sort((a, b) => a.seq - b.seq);
+  const filtersActive = needle !== "" || labelFilter !== "all" || cycleFilter !== "all" || filter !== "all";
+  const clearFilters = () => {
+    setQuery("");
+    setLabelFilter("all");
+    setCycleFilter("all");
+    setFilter("all");
+  };
   const visible = filter === "all" ? live : live.filter((i) => i.status === filter);
   const count = (f: Filter) => (f === "all" ? live.length : live.filter((i) => i.status === f).length);
   const projectRecord = getProjects().find((p) => p.id === projectId);
@@ -1355,6 +1375,37 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             className="w-48 rounded-md border border-neutral-300 bg-white py-1 pl-7 pr-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
         </div>
+        <select
+          value={labelFilter}
+          onChange={(e) => setLabelFilter(WORK_ITEM_LABELS.find((l) => l === e.target.value) ?? "all")}
+          aria-label="Filter by label"
+          className="rounded-md border border-neutral-300 bg-white py-1 pl-2 pr-6 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        >
+          <option value="all">All labels</option>
+          {WORK_ITEM_LABELS.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+        <select
+          value={cycleFilter}
+          onChange={(e) => setCycleFilter(e.target.value)}
+          aria-label="Filter by cycle"
+          className="max-w-48 rounded-md border border-neutral-300 bg-white py-1 pl-2 pr-6 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+        >
+          <option value="all">All cycles</option>
+          {cycleNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        {filtersActive && (
+          <button type="button" onClick={clearFilters} className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-neutral-600 hover:bg-neutral-100">
+            <X className="h-3.5 w-3.5" aria-hidden /> Clear filters
+          </button>
+        )}
         <p className="ml-auto hidden text-xs text-neutral-500 md:block">
           Shortcuts: <kbd className="font-mono">C</kbd> new · <kbd className="font-mono">/</kbd> search ·{" "}
           <kbd className="font-mono">B</kbd> board · <kbd className="font-mono">L</kbd> list

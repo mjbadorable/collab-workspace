@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Check, Plus } from "lucide-react";
 import { useStorageTarget } from "@/lib/storage-target";
 import { useIsClient } from "@/lib/use-is-client";
@@ -14,15 +15,27 @@ const STATUS_LABEL: Record<WorkItemStatus, string> = { backlog: "Backlog", in_pr
 
 function Suggestions({ projectId, workspaceId }: { projectId: string; workspaceId: string | null }) {
   const { items, add } = useWorkItems(projectId, workspaceId);
+  const [expanded, setExpanded] = useState(false);
+
+  const doneCount = items ? ROADMAP.filter((r) => items.some((i) => !i.deleted_at && i.title === r.title && i.status === "done")).length : null;
+  // Newest milestones first; collapsed, only the six most recent.
+  const shown = expanded ? [...ROADMAP].reverse() : ROADMAP.slice(-6).reverse();
 
   return (
     <section aria-labelledby="ov-suggest">
-      <h2 id="ov-suggest" className="text-sm font-semibold text-neutral-700">
-        Workspace Roadmap · CW-1 to CW-{ROADMAP.length}
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="ov-suggest" className="text-sm font-semibold text-neutral-700">
+          Workspace Roadmap · CW-1 to CW-{ROADMAP.length}
+        </h2>
+        {doneCount !== null && (
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+            {doneCount} / {ROADMAP.length} completed
+          </span>
+        )}
+      </div>
       <p className="mt-1 text-xs text-neutral-500">Milestones for the Next-Gen workspace, with their live status from the board.</p>
       <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {ROADMAP.map((r) => {
+        {shown.map((r) => {
           const onBoard = items?.find((i) => !i.deleted_at && i.title === r.title);
           return (
             <li key={r.key} className="flex flex-col rounded-xl border border-neutral-200 bg-white p-4 shadow-xs">
@@ -55,6 +68,14 @@ function Suggestions({ projectId, workspaceId }: { projectId: string; workspaceI
           );
         })}
       </ul>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="mt-3 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
+      >
+        {expanded ? "Show fewer milestones" : `Show all ${ROADMAP.length} milestones`}
+      </button>
     </section>
   );
 }

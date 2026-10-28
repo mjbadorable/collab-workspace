@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { ProfileProvider } from "@/lib/profile-context";
 import { ProjectsProvider } from "@/lib/projects-context";
@@ -45,7 +45,22 @@ function Chrome({ children }: { children: ReactNode }) {
   const [profileRequested, setProfileRequested] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
+
+  // "[" folds the desktop sidebar away (and back), unless you are typing or a dialog is open.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "[" || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))) return;
+      if (document.querySelector("dialog[open]")) return;
+      setSidebarCollapsed((c) => !c);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   // The Team Room belongs to the project whose pages are open.
   const projectId = pathname.match(/^\/projects\/([^/]+)/)?.[1] ?? null;
 
@@ -56,17 +71,38 @@ function Chrome({ children }: { children: ReactNode }) {
     <NewWorkItemProvider>
     <div className="flex h-screen overflow-hidden">
       {/* Desktop: fixed sidebar */}
-      <aside className="hidden md:block">
-        <Suspense fallback={<SidebarFallback />}>
-          <Sidebar
-            onNewWorkspace={() => setWorkspaceRequested(true)}
-            onInvite={() => setInviteRequested(true)}
-            onEditProfile={() => setProfileRequested(true)}
-            onSearch={() => setPaletteOpen(true)}
-            onShortcuts={() => setShortcutsOpen(true)}
-          />
-        </Suspense>
-      </aside>
+      {sidebarCollapsed ? (
+        <button
+          type="button"
+          onClick={() => setSidebarCollapsed(false)}
+          title="Open sidebar ([)"
+          aria-label="Open sidebar"
+          className="fixed left-0 top-20 z-20 hidden rounded-r-full border border-l-0 border-neutral-200 bg-white py-1.5 pl-1 pr-1.5 text-neutral-500 shadow-md hover:text-neutral-900 md:block"
+        >
+          <PanelLeftOpen className="h-4 w-4" />
+        </button>
+      ) : (
+        <aside className="relative hidden md:block">
+          <Suspense fallback={<SidebarFallback />}>
+            <Sidebar
+              onNewWorkspace={() => setWorkspaceRequested(true)}
+              onInvite={() => setInviteRequested(true)}
+              onEditProfile={() => setProfileRequested(true)}
+              onSearch={() => setPaletteOpen(true)}
+              onShortcuts={() => setShortcutsOpen(true)}
+            />
+          </Suspense>
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed(true)}
+            title="Collapse sidebar ([)"
+            aria-label="Collapse sidebar"
+            className="absolute -right-3 top-20 z-20 rounded-full border border-neutral-200 bg-white p-1 text-neutral-500 shadow-md hover:text-neutral-900"
+          >
+            <PanelLeftClose className="h-4 w-4" />
+          </button>
+        </aside>
+      )}
 
       {/* Mobile: slide-over drawer */}
       {mobileOpen && (
