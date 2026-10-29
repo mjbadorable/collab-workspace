@@ -12,6 +12,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
 /* Printing the export dialog: only the report (.print-area) is shown, as a plain white document. */
 @media print {
   html,

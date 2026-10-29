@@ -92,7 +92,7 @@ function Chrome({ children }: { children: ReactNode }) {
 
   return (
     <NewWorkItemProvider>
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-full w-full overflow-hidden">
       {/* Desktop: fixed sidebar */}
       {sidebarCollapsed ? (
         <button
@@ -105,7 +105,7 @@ function Chrome({ children }: { children: ReactNode }) {
           <PanelLeftOpen className="h-4 w-4" />
         </button>
       ) : (
-        <aside className="relative hidden md:block">
+        <aside className="relative hidden h-full md:block">
           <Suspense fallback={<SidebarFallback />}>
             <Sidebar
               onNewWorkspace={() => setWorkspaceRequested(true)}
@@ -174,7 +174,7 @@ function Chrome({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex h-full min-w-0 flex-1 flex-col">
         <header className="flex items-center border-b border-neutral-200 px-4 py-2 md:hidden">
           <button
             type="button"
