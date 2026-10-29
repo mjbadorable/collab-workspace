@@ -94,6 +94,9 @@ export function seedItems(projectId: string): StoredWorkItem[] {
       seed(40, "Deep-dive engineering analytics: 14-day velocity, cycle and module progress, hygiene scorecard", "done", "medium", mockUser.id),
       seed(41, "Live local dev & git push monitor with unpushed-commit banner and 1-click push command", "done", "high", mockUser.id),
       seed(42, "Cloud Device Handoff & Memory Vault for office-PC to laptop session transfer", "done", "high", mockUser.id),
+      seed(43, "Fleet multi-repo local dev & git monitor across collab-workspace, exam-reviewer-app and the grade assistant", "done", "high", mockUser.id),
+      seed(44, "1-click shareable transfer link and auto-receive URL handler for Device Handoff", "done", "medium", mockUser.id),
+      seed(45, "PWA manifest and real-time offline/online connectivity sentinel banner", "done", "medium", mockUser.id),
     ];
   }
 
@@ -120,7 +123,7 @@ export function seedItems(projectId: string): StoredWorkItem[] {
   ];
 }
 
-const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v9";
+const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v10";
 
 // Earlier wordings of seed titles, so a board that already holds the old title is not given a duplicate.
 export const SEED_TITLE_ALIASES: Record<string, string[]> = {

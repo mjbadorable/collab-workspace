@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowDownToLine, ArrowUpFromLine, Check, Copy, FileDown, FileUp, Laptop, RefreshCw, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Check, Copy, FileDown, FileUp, Laptop, Link2, RefreshCw, X } from "lucide-react";
 import {
   applySnapshot,
   burnSnapshot,
   CODE_LENGTH,
   collectSnapshot,
   downloadSnapshot,
+  isCode,
   MAX_MEMO,
   normalizeCode,
   parseSnapshotFile,
@@ -33,7 +34,13 @@ function minutesLeft(expiresAt: number): number {
   return Math.max(0, Math.ceil((expiresAt - Date.now()) / 60_000));
 }
 
-function CopyCode({ code }: { code: string }) {
+// The 1-click link is the deployed app's address plus the code; the receiving app reads ?handoff= on load.
+const transferLink = (code: string) => `${window.location.origin}/?handoff=${code}`;
+
+// localhost and loopback addresses only exist on the machine they were typed on.
+const isLocalOrigin = () => ["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname) || window.location.hostname.endsWith(".localhost");
+
+function CopyButton({ text, label, icon: Icon }: { text: string; label: string; icon: typeof Copy }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -47,17 +54,16 @@ function CopyCode({ code }: { code: string }) {
       type="button"
       onClick={async () => {
         try {
-          await navigator.clipboard.writeText(code);
+          await navigator.clipboard.writeText(text);
           setCopied(true);
         } catch {
           // clipboard blocked: the code is on screen to type by hand
         }
       }}
-      className="flex items-center gap-2 rounded-lg border border-emerald-300 bg-white px-3 py-2 font-mono text-2xl font-bold tracking-[0.3em] text-emerald-800 hover:bg-emerald-100"
-      aria-label={`Copy handoff code ${code.split("").join(" ")}`}
+      className={secondary}
     >
-      {code}
-      {copied ? <Check className="h-4 w-4 shrink-0" aria-hidden /> : <Copy className="h-4 w-4 shrink-0" aria-hidden />}
+      {copied ? <Check className="h-4 w-4" aria-hidden /> : <Icon className="h-4 w-4" aria-hidden />}
+      {copied ? "Copied" : label}
     </button>
   );
 }
@@ -141,16 +147,31 @@ function SendPanel() {
       {pushed && (
         <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3">
           <p className="text-xs font-semibold text-emerald-900">
-            {pushed.keysCount} workspace keys are waiting in the vault. Type this code on the other device:
+            {pushed.keysCount} workspace keys are waiting in the vault. Type this code on the other device, or send it the link:
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <CopyCode code={pushed.code} />
+            <p
+              className="rounded-lg border border-emerald-300 bg-white px-3 py-2 font-mono text-2xl font-bold tracking-[0.3em] text-emerald-800"
+              aria-label={`Handoff code ${pushed.code.split("").join(" ")}`}
+            >
+              {pushed.code}
+            </p>
             <p className="text-xs text-emerald-800">
               Expires in {minutesLeft(pushed.expiresAt)} min
               <br />
               <span className="text-emerald-700">{new Date(pushed.expiresAt).toLocaleTimeString()}</span>
             </p>
           </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <CopyButton text={pushed.code} label="Copy Code" icon={Copy} />
+            <CopyButton text={transferLink(pushed.code)} label="Copy 1-Click Link" icon={Link2} />
+          </div>
+          {isLocalOrigin() && (
+            <p className="mt-2 text-[11px] text-emerald-800">
+              This app is open on localhost, so the link only works on this machine. On your other device, open the
+              deployed app and type the code instead.
+            </p>
+          )}
         </div>
       )}
 
@@ -162,12 +183,30 @@ function SendPanel() {
   );
 }
 
-function ReceivePanel() {
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+function ReceivePanel({ initialCode }: { initialCode?: string }) {
+  const startCode = initialCode ? normalizeCode(initialCode) : "";
+  const [code, setCode] = useState(startCode);
+  // A valid code from a transfer link is fetched straight away, so the panel opens already loading.
+  const [busy, setBusy] = useState(isCode(startCode));
+  const [error, setError] = useState<string | null>(
+    startCode && !isCode(startCode) ? `"${startCode}" is not a valid handoff code. Check the link or type the code again.` : null
+  );
   const [incoming, setIncoming] = useState<{ snapshot: HandoffSnapshot; code: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isCode(startCode)) return;
+    let cancelled = false;
+    pullSnapshot(startCode).then((result) => {
+      if (cancelled) return;
+      setBusy(false);
+      if (result.ok) setIncoming({ snapshot: result.snapshot, code: startCode });
+      else setError(result.error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [startCode]);
 
   const fetchByCode = async () => {
     setBusy(true);
@@ -254,7 +293,7 @@ function ReceivePanel() {
           </p>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={restore} className={primary}>
-              <ArrowDownToLine className="h-4 w-4" aria-hidden /> Restore on this device
+              <ArrowDownToLine className="h-4 w-4" aria-hidden /> Restore Snapshot
             </button>
             <button type="button" onClick={() => setIncoming(null)} className={secondary}>
               Cancel
@@ -318,12 +357,59 @@ const tabClass = (active: boolean) =>
     active ? "bg-white text-neutral-900 shadow-xs" : "text-neutral-600 hover:text-neutral-900"
   }`;
 
+// Mounted only while the dialog is open, so the starting tab follows initialCode each time it opens.
+function Body({ onClose, initialCode }: { onClose: () => void; initialCode?: string }) {
+  const [tab, setTab] = useState<Tab>(initialCode ? "receive" : "send");
+
+  return (
+    <div className="max-h-[85vh] overflow-y-auto p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">📡 Cloud Device Handoff</h2>
+          <p className="mt-0.5 text-xs text-neutral-500">Carry this session to your other machine, memo and all.</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 text-neutral-500 hover:bg-neutral-100">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="mt-3">
+        <DeviceNameField />
+      </div>
+
+      <div role="tablist" aria-label="Handoff direction" className="mt-3 flex gap-1 rounded-lg border border-neutral-200 bg-neutral-100 p-1">
+        <button type="button" role="tab" aria-selected={tab === "send"} onClick={() => setTab("send")} className={tabClass(tab === "send")}>
+          Send from here
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "receive"} onClick={() => setTab("receive")} className={tabClass(tab === "receive")}>
+          Receive here
+        </button>
+      </div>
+
+      <div className="mt-3">{tab === "send" ? <SendPanel /> : <ReceivePanel initialCode={initialCode} />}</div>
+
+      <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-neutral-500">Memory vault</h3>
+      <div className="mt-2">
+        <VaultLog />
+      </div>
+    </div>
+  );
+}
+
 // Moves a whole working session between machines (office PC ⇄ laptop): every workspace key on this device plus
-// a memo about where the work stopped, parked in the cloud vault under a 6-character code or carried as a
-// .json file. The vault log below is the memory trail of what was handed over and when.
-export default function DeviceHandoffModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+// a memo about where the work stopped, parked in the cloud vault under a 6-character code (or a link carrying
+// it) or carried as a .json file. The vault log below is the memory trail of what was handed over and when.
+// initialCode comes from a ?handoff= link: the modal opens on Receive with the code already fetched.
+export default function DeviceHandoffModal({
+  open,
+  onClose,
+  initialCode,
+}: {
+  open: boolean;
+  onClose: () => void;
+  initialCode?: string;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [tab, setTab] = useState<Tab>("send");
 
   useEffect(() => {
     const dialog = ref.current;
@@ -341,39 +427,7 @@ export default function DeviceHandoffModal({ open, onClose }: { open: boolean; o
       className="m-auto w-full max-w-lg rounded-xl border border-neutral-200 p-0 shadow-xl backdrop:bg-black/30"
     >
       {/* Rendered only while open: the panels read localStorage, which the server has no copy of. */}
-      {open && (
-        <div className="max-h-[85vh] overflow-y-auto p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold">📡 Cloud Device Handoff</h2>
-              <p className="mt-0.5 text-xs text-neutral-500">Carry this session to your other machine, memo and all.</p>
-            </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="rounded p-1 text-neutral-500 hover:bg-neutral-100">
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="mt-3">
-            <DeviceNameField />
-          </div>
-
-          <div role="tablist" aria-label="Handoff direction" className="mt-3 flex gap-1 rounded-lg border border-neutral-200 bg-neutral-100 p-1">
-            <button type="button" role="tab" aria-selected={tab === "send"} onClick={() => setTab("send")} className={tabClass(tab === "send")}>
-              Send from here
-            </button>
-            <button type="button" role="tab" aria-selected={tab === "receive"} onClick={() => setTab("receive")} className={tabClass(tab === "receive")}>
-              Receive here
-            </button>
-          </div>
-
-          <div className="mt-3">{tab === "send" ? <SendPanel /> : <ReceivePanel />}</div>
-
-          <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-neutral-500">Memory vault</h3>
-          <div className="mt-2">
-            <VaultLog />
-          </div>
-        </div>
-      )}
+      {open && <Body onClose={onClose} initialCode={initialCode} />}
     </dialog>
   );
 }

@@ -173,7 +173,7 @@ function Portfolio({ projects, workspaceId }: { projects: ProjectRecord[]; works
   return (
     <>
       <div className="mt-6">
-        <LocalDevWidget />
+        <LocalDevWidget showFleetTabs />
       </div>
 
       <div className="mt-6">
@@ -293,7 +293,7 @@ export default function HomeDashboard() {
       ) : (
         <>
           <div className="mt-6">
-            <LocalDevWidget />
+            <LocalDevWidget showFleetTabs />
           </div>
 
           <LiveWorkItems projectId={selected.id} fallback={<div className="mt-6 h-96" />}>

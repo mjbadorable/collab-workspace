@@ -69,12 +69,18 @@ Instead of embedding sub-projects directly into the workspace codebase, the port
 - Amber pulsing banner when commits are waiting, with a 1-click **Copy `git push origin <branch>`** button and the pending commit subjects.
 - Collapsible list of uncommitted files, plus the latest commit sha, subject and age.
 - The route answers `{ isLocal: false }` off localhost, so the deployed app shows a `☁️ Cloud Deployment (Vercel)` badge instead of shelling out to git.
+- **Fleet mode (CW-43):** `?all=true` reads `collab-workspace`, `exam-reviewer-app` and `mastersoft-grade-encoding-assistant` from their folders on the dev machine; `?project=<id>` reads one. The Home dashboard shows a fleet tab bar (`All Fleet` summary grid + one tab per repo, yellow dot when a repo has pending work); a project overview shows only its own repo with its folder path and a `git -C "<path>" push origin <branch>` copy button. A folder only counts if it is itself a git work-tree root, and a repo that is missing on disk is reported as `notFound` rather than an error.
 
 ### 8. Cloud Device Handoff & Memory Vault (`/api/device-handoff`)
 - Packs every `collab-workspace:` key on the device plus a **session memo** into one snapshot and parks it in a server-memory locker under a 6-character code (no I/O/0/1), good for 30 minutes.
 - The other machine types the code, previews the snapshot (device, capture time, memo, key count) and restores it in one click; the vault copy is burned afterwards.
 - `.json` download and import as the durable fallback — a redeploy or cold start clears the in-memory locker.
+- **1-click transfer link (CW-44):** after a push, *Copy 1-Click Link* copies `<origin>/?handoff=<code>`. Opening it on the other device opens the modal on **Receive** with the code already fetched, so only **Restore Snapshot** is left. The parameter is stripped from the address bar immediately. (A link made from `localhost` only works on that machine; use the deployed app's address.)
 - Named devices (Edtech-03 ⇄ Laptop) and a **memory vault log** of the last 12 handoffs with their memos. A restore never overwrites the receiving device's own name or history.
+
+### 9. PWA Manifest & Connectivity Sentinel
+- `public/manifest.json` (standalone display, dark theme colors) linked from the root layout metadata.
+- `NetworkStatusBar` listens to the browser `online` / `offline` events: an amber *Offline mode — changes saved locally in browser* pill slides in on disconnect, and a green *Reconnected — cloud sync resumed* pill shows for 4 seconds when the connection returns.
 
 ---
 
@@ -166,6 +172,9 @@ collab-workspace/
 | `CW-40` | Deep-dive engineering analytics: 14-day velocity, cycle and module progress, hygiene scorecard | Done | Medium |
 | `CW-41` | Live local dev & git push monitor with unpushed-commit banner and 1-click push command | Done | High |
 | `CW-42` | Cloud Device Handoff & Memory Vault for office-PC to laptop session transfer | Done | High |
+| `CW-43` | Fleet multi-repo local dev & git monitor across collab-workspace, exam-reviewer-app and the grade assistant | Done | High |
+| `CW-44` | 1-click shareable transfer link and auto-receive URL handler for Device Handoff | Done | Medium |
+| `CW-45` | PWA manifest and real-time offline/online connectivity sentinel banner | Done | Medium |
 
 ---
 

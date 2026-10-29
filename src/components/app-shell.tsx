@@ -10,6 +10,8 @@ import { WorkspaceProvider } from "@/lib/workspace-context";
 import CommandPalette from "./command-palette";
 import { ConfettiCanvas } from "./confetti-burst";
 import DeviceHandoffModal from "./device-handoff-modal";
+import NetworkStatusBar from "./network-status-bar";
+import { isCode, normalizeCode } from "@/lib/device-handoff";
 import ShortcutsDialog from "./shortcuts-dialog";
 import FocusTimerDock from "./focus-timer-dock";
 import TeamRoomDock from "./projects/team-room-dock";
@@ -47,8 +49,27 @@ function Chrome({ children }: { children: ReactNode }) {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
+  // Set when the page was opened from a ?handoff=<code> transfer link; the modal then starts on Receive.
+  const [initialHandoffCode, setInitialHandoffCode] = useState<string | undefined>();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
+
+  // A transfer link (/?handoff=H9X2K4) opens the handoff modal on the Receive tab with the code filled in. The
+  // location is only readable in the browser, so this has to run after mount. The parameter is removed from the
+  // address right away: restoring reloads the page, and a reload must not reopen the modal on a spent code.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("handoff");
+    if (raw === null) return;
+    params.delete("handoff");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+    const code = normalizeCode(raw);
+    if (!isCode(code)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL does not exist during server rendering
+    setInitialHandoffCode(code);
+    setHandoffOpen(true);
+  }, []);
 
   // "[" folds the desktop sidebar away (and back), unless you are typing or a dialog is open.
   useEffect(() => {
@@ -170,7 +191,15 @@ function Chrome({ children }: { children: ReactNode }) {
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
     <FocusTimerDock />
     <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-    <DeviceHandoffModal open={handoffOpen} onClose={() => setHandoffOpen(false)} />
+    <DeviceHandoffModal
+      open={handoffOpen}
+      initialCode={initialHandoffCode}
+      onClose={() => {
+        setHandoffOpen(false);
+        setInitialHandoffCode(undefined);
+      }}
+    />
+    <NetworkStatusBar />
     <ConfettiCanvas />
     <InviteDialog open={inviteRequested} onClose={() => setInviteRequested(false)} />
     <EditProfileDialog open={profileRequested} onClose={() => setProfileRequested(false)} />

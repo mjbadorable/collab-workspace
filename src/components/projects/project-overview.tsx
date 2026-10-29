@@ -253,8 +253,8 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
         </div>
       </section>
 
-      {/* The working tree of whichever repo serves this dev server, not of this project in particular. */}
-      <LocalDevWidget collapsible />
+      {/* This project's own repo on the dev machine; a project outside the known fleet shows "Repo not found". */}
+      <LocalDevWidget projectId={project.id} collapsible />
 
       <GithubActivity githubUrl={project.github_url} liveUrl={project.live_url} />
 
