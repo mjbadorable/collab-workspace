@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Check, Circle, Diamond, ExternalLink, FileDown, GitFork, Square, type LucideIcon } from "lucide-react";
 import HealthPill from "@/components/home/health-pill";
 import LiveWorkItems from "@/components/home/live-work-items";
+import LocalDevWidget from "@/components/home/local-dev-widget";
 import { progressOf } from "@/components/home/project-card";
 import ProjectAvatar from "@/components/project-avatar";
 import ExportReportDialog from "@/components/projects/export-report-dialog";
@@ -251,6 +252,9 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
           </table>
         </div>
       </section>
+
+      {/* The working tree of whichever repo serves this dev server, not of this project in particular. */}
+      <LocalDevWidget collapsible />
 
       <GithubActivity githubUrl={project.github_url} liveUrl={project.live_url} />
 

@@ -9,6 +9,7 @@ import { ProjectsProvider } from "@/lib/projects-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import CommandPalette from "./command-palette";
 import { ConfettiCanvas } from "./confetti-burst";
+import DeviceHandoffModal from "./device-handoff-modal";
 import ShortcutsDialog from "./shortcuts-dialog";
 import FocusTimerDock from "./focus-timer-dock";
 import TeamRoomDock from "./projects/team-room-dock";
@@ -45,6 +46,7 @@ function Chrome({ children }: { children: ReactNode }) {
   const [profileRequested, setProfileRequested] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [handoffOpen, setHandoffOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
 
@@ -90,6 +92,7 @@ function Chrome({ children }: { children: ReactNode }) {
               onEditProfile={() => setProfileRequested(true)}
               onSearch={() => setPaletteOpen(true)}
               onShortcuts={() => setShortcutsOpen(true)}
+              onDeviceHandoff={() => setHandoffOpen(true)}
             />
           </Suspense>
           <button
@@ -131,6 +134,10 @@ function Chrome({ children }: { children: ReactNode }) {
                   setMobileOpen(false);
                   setShortcutsOpen(true);
                 }}
+                onDeviceHandoff={() => {
+                  setMobileOpen(false);
+                  setHandoffOpen(true);
+                }}
               />
             </Suspense>
             <button
@@ -163,6 +170,7 @@ function Chrome({ children }: { children: ReactNode }) {
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
     <FocusTimerDock />
     <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+    <DeviceHandoffModal open={handoffOpen} onClose={() => setHandoffOpen(false)} />
     <ConfettiCanvas />
     <InviteDialog open={inviteRequested} onClose={() => setInviteRequested(false)} />
     <EditProfileDialog open={profileRequested} onClose={() => setProfileRequested(false)} />

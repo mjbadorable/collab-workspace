@@ -64,6 +64,18 @@ Instead of embedding sub-projects directly into the workspace codebase, the port
   - 🧢 Trainer · 🏅 Gym Leader · 🔬 Professor · 🏆 Champion · 🌟 Elite Four · ⚡ Pokémon · 🚀 Team Rocket · 🧭 Ace Trainer · ⚔️ Rival · 🥋 Battle Legend
 - 10 quick-pick bio suggestions for full-stack developers and systems architects.
 
+### 7. Live Local Dev & Git Push Monitor (`/api/local-git-status`)
+- Reads the working tree the dev server runs from — branch, uncommitted files, commits ahead of `origin` — and polls it every 10 seconds while the tab is visible.
+- Amber pulsing banner when commits are waiting, with a 1-click **Copy `git push origin <branch>`** button and the pending commit subjects.
+- Collapsible list of uncommitted files, plus the latest commit sha, subject and age.
+- The route answers `{ isLocal: false }` off localhost, so the deployed app shows a `☁️ Cloud Deployment (Vercel)` badge instead of shelling out to git.
+
+### 8. Cloud Device Handoff & Memory Vault (`/api/device-handoff`)
+- Packs every `collab-workspace:` key on the device plus a **session memo** into one snapshot and parks it in a server-memory locker under a 6-character code (no I/O/0/1), good for 30 minutes.
+- The other machine types the code, previews the snapshot (device, capture time, memo, key count) and restores it in one click; the vault copy is burned afterwards.
+- `.json` download and import as the durable fallback — a redeploy or cold start clears the in-memory locker.
+- Named devices (Edtech-03 ⇄ Laptop) and a **memory vault log** of the last 12 handoffs with their memos. A restore never overwrites the receiving device's own name or history.
+
 ---
 
 ## 📁 Project Structure
@@ -73,8 +85,10 @@ collab-workspace/
 ├── src/
 │   ├── app/                                 # Next.js App Router routes
 │   │   ├── api/
+│   │   │   ├── device-handoff/route.ts      # Short-lived cloud locker for device-to-device handoffs
 │   │   │   ├── github-breakdown/route.ts    # GitHub repository parser & task extractor
-│   │   │   └── health-check/route.ts        # SSRF-guarded production latency pinger
+│   │   │   ├── health-check/route.ts        # SSRF-guarded production latency pinger
+│   │   │   └── local-git-status/route.ts    # Local-only branch, uncommitted & unpushed commit reader
 │   │   ├── projects/
 │   │   │   └── [id]/
 │   │   │       ├── architecture/page.tsx    # Technical 4-layer system architecture blueprint
@@ -150,6 +164,8 @@ collab-workspace/
 | `CW-38` | 60-second health heartbeat with re-check button and latency telemetry popover | Done | High |
 | `CW-39` | 1-click Assign Tickets pickers on Cycle and Module cards | Done | Medium |
 | `CW-40` | Deep-dive engineering analytics: 14-day velocity, cycle and module progress, hygiene scorecard | Done | Medium |
+| `CW-41` | Live local dev & git push monitor with unpushed-commit banner and 1-click push command | Done | High |
+| `CW-42` | Cloud Device Handoff & Memory Vault for office-PC to laptop session transfer | Done | High |
 
 ---
 

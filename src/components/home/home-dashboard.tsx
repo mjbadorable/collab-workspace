@@ -25,6 +25,7 @@ import {
 } from "@/lib/work-items-storage";
 import HealthPill from "./health-pill";
 import LiveWorkItems from "./live-work-items";
+import LocalDevWidget from "./local-dev-widget";
 import ProjectCard from "./project-card";
 import StandupDialog from "./standup-dialog";
 
@@ -172,6 +173,10 @@ function Portfolio({ projects, workspaceId }: { projects: ProjectRecord[]; works
   return (
     <>
       <div className="mt-6">
+        <LocalDevWidget />
+      </div>
+
+      <div className="mt-6">
         <GymBadgeCase />
       </div>
 
@@ -287,6 +292,10 @@ export default function HomeDashboard() {
         )
       ) : (
         <>
+          <div className="mt-6">
+            <LocalDevWidget />
+          </div>
+
           <LiveWorkItems projectId={selected.id} fallback={<div className="mt-6 h-96" />}>
             {(items, error) => (
               <>
