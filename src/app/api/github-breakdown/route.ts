@@ -301,5 +301,10 @@ export async function GET(request: Request) {
     backend_stack: backend.join(", "),
   };
 
-  return Response.json({ ok: true, project, workItems: extractWorkItems(todos, features) });
+  return Response.json({ ok: true, project, workItems: extractWorkItems(todos, features) }, {
+    headers: {
+      // Edge-cached for 2 minutes, then served stale while it refreshes in the background.
+      "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+    },
+  });
 }

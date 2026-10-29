@@ -1,9 +1,12 @@
+import { supabase } from "@/lib/supabase";
+
 // The cloud half of the device handoff: a short-lived locker that holds one device's workspace snapshot until
 // the other device fetches it with the code.
 //
-// The locker lives in this module's memory, which means it is per server instance and is lost on a cold start
-// or a redeploy. That is fine for a handoff measured in minutes, and the modal always offers the .json file as
-// the durable fallback. Nothing is ever written to disk.
+// When Supabase is configured the snapshot is stored in the device_handoffs table, so a code survives cold
+// starts, redeploys and requests that land on a different serverless instance. The module-level map below is
+// the hot cache in front of it and the whole fallback when Supabase is missing or unreachable (per instance,
+// lost on a cold start). The modal always offers the .json file as the durable fallback of last resort.
 
 const TTL_MS = 30 * 60_000;
 const MAX_ENTRIES = 20;
@@ -112,6 +115,20 @@ export async function POST(request: Request) {
 
   const code = newCode();
   const expiresAt = now + TTL_MS;
+  if (supabase) {
+    try {
+      // supabase-js reports failures in the result rather than throwing; either way the memory vault still has it.
+      await supabase.from("device_handoffs").insert({
+        code,
+        snapshot: parsed,
+        memo: parsed.memo || null,
+        source_device: parsed.device || null,
+        expires_at: new Date(expiresAt).toISOString(),
+      });
+    } catch {
+      // Graceful fallback to memory vault
+    }
+  }
   vault.set(code, { snapshot: parsed, expiresAt });
   return Response.json({ ok: true, code, expiresAt });
 }
@@ -126,6 +143,27 @@ export async function GET(request: Request) {
 
   const code = new URL(request.url).searchParams.get("code")?.toUpperCase() ?? "";
   if (!CODE_PATTERN.test(code)) return fail(`A handoff code is ${CODE_LENGTH} characters.`, 400);
+
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from("device_handoffs")
+        .select("snapshot, expires_at")
+        .eq("code", code)
+        .gt("expires_at", new Date(now).toISOString())
+        .maybeSingle();
+
+      if (data && isSnapshot(data.snapshot)) {
+        return Response.json({
+          ok: true,
+          snapshot: data.snapshot,
+          expiresAt: new Date(data.expires_at).getTime(),
+        });
+      }
+    } catch {
+      // Fall through to memory lookup
+    }
+  }
 
   const entry = vault.get(code);
   if (!entry) {
@@ -142,5 +180,14 @@ export async function DELETE(request: Request) {
 
   const code = new URL(request.url).searchParams.get("code")?.toUpperCase() ?? "";
   if (!CODE_PATTERN.test(code)) return fail(`A handoff code is ${CODE_LENGTH} characters.`, 400);
-  return Response.json({ ok: vault.delete(code) });
+  let removed = false;
+  if (supabase) {
+    try {
+      const { data } = await supabase.from("device_handoffs").delete().eq("code", code).select("code");
+      removed = (data?.length ?? 0) > 0;
+    } catch {
+      // The memory vault below is still cleared.
+    }
+  }
+  return Response.json({ ok: vault.delete(code) || removed });
 }

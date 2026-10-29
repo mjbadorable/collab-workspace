@@ -65,6 +65,32 @@ export type Database = {
       projects: Table<Project, "workspace_id" | "name" | "identifier">;
       work_items: Table<WorkItem, "project_id" | "title">;
       diagrams: Table<Diagram, "project_id" | "name" | "type">;
+      device_handoffs: {
+        Row: {
+          code: string;
+          snapshot: Json;
+          memo: string | null;
+          source_device: string | null;
+          expires_at: string;
+          created_at: string;
+        };
+        Insert: {
+          code: string;
+          snapshot: Json;
+          memo?: string | null;
+          source_device?: string | null;
+          expires_at: string;
+          created_at?: string;
+        };
+        Update: Partial<{
+          code: string;
+          snapshot: Json;
+          memo: string | null;
+          source_device: string | null;
+          expires_at: string;
+        }>;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {

@@ -113,6 +113,11 @@ export async function GET(request: Request) {
         date: c.commit.author?.date ?? "",
         commitUrl: c.html_url,
       })),
+    }, {
+      headers: {
+        // Edge-cached for 2 minutes, then served stale while it refreshes in the background.
+        "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+      },
     });
   } catch {
     return fail("Could not reach GitHub. Check your connection and try again.");

@@ -175,6 +175,8 @@ collab-workspace/
 | `CW-43` | Fleet multi-repo local dev & git monitor across collab-workspace, exam-reviewer-app and the grade assistant | Done | High |
 | `CW-44` | 1-click shareable transfer link and auto-receive URL handler for Device Handoff | Done | Medium |
 | `CW-45` | PWA manifest and real-time offline/online connectivity sentinel banner | Done | Medium |
+| `CW-46` | Durable Supabase Device Handoff Table with automatic in-memory fallback for cold starts | Done | High |
+| `CW-47` | Vercel Edge Caching & API Rate-Limit Armor for GitHub and health telemetry | Done | Medium |
 
 ---
 
