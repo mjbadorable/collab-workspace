@@ -99,6 +99,8 @@ export function seedItems(projectId: string): StoredWorkItem[] {
       seed(45, "PWA manifest and real-time offline/online connectivity sentinel banner", "done", "medium", mockUser.id),
       seed(46, "Durable Supabase Device Handoff Table with automatic in-memory fallback for cold starts", "done", "high", mockUser.id),
       seed(47, "Vercel Edge Caching & API Rate-Limit Armor for GitHub and health telemetry", "done", "medium", mockUser.id),
+      seed(48, "Dual Environment Switcher: Production vs Staging/Testing mode with localStorage persistence", "done", "high", mockUser.id),
+      seed(49, "Read-only Local Source Code Inspector with sandboxed file tree and code viewer", "done", "high", mockUser.id),
     ];
   }
 
@@ -125,7 +127,7 @@ export function seedItems(projectId: string): StoredWorkItem[] {
   ];
 }
 
-const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v11";
+const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v12";
 
 // Earlier wordings of seed titles, so a board that already holds the old title is not given a duplicate.
 export const SEED_TITLE_ALIASES: Record<string, string[]> = {

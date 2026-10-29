@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+import { FLEET_PATHS, isLocalhost } from "@/lib/fleet-paths";
 
 const run = promisify(execFile);
 
@@ -31,31 +32,7 @@ type GitStatusResponse = { isLocal: false } | RepoStatus | { isLocal: true; flee
 const CLOUD: GitStatusResponse = { isLocal: false };
 const NOT_FOUND: RepoStatus = { isLocal: true, notFound: true, repoPath: null };
 
-// The developer's fleet: project id -> folders it may live in on this machine, most likely first.
-// Only these ids are ever resolved, so ?project= can never point git at an arbitrary directory.
-const FLEET_PATHS: Record<string, string[]> = {
-  "collab-workspace": [process.cwd()],
-  "exam-reviewer-app": [
-    "C:\\Users\\MarvinJhayAdorable\\Projects\\exam-reviewer-app",
-    path.resolve(process.cwd(), "..", "Projects", "exam-reviewer-app"),
-    path.resolve(process.cwd(), "..", "exam-reviewer-app"),
-  ],
-  "mastersoft-grade-encoding-assistant": [
-    "C:\\Users\\MarvinJhayAdorable\\Mastersoft-Grade-Encoding-Assistant-repo",
-    path.resolve(process.cwd(), "..", "Mastersoft-Grade-Encoding-Assistant-repo"),
-    "C:\\Users\\MarvinJhayAdorable\\Projects\\Mastersoft-Grade-Encoding-Assistant-main",
-  ],
-};
-
 const FLEET_IDS = Object.keys(FLEET_PATHS);
-
-// Shelling out to git only makes sense on the machine the working tree lives on. A Vercel deployment
-// answers { isLocal: false } and the widget shows the cloud badge instead.
-function isLocalhost(host: string | null): boolean {
-  if (!host) return false;
-  const name = host.replace(/:\d+$/, "").replace(/^\[|\]$/g, "").toLowerCase();
-  return name === "localhost" || name === "127.0.0.1" || name === "::1" || name.endsWith(".localhost");
-}
 
 // Returns null when git itself fails (not a repo, no git on PATH, no upstream, no commits yet), so every
 // caller decides what the absence of that answer means rather than the request blowing up.

@@ -177,6 +177,8 @@ collab-workspace/
 | `CW-45` | PWA manifest and real-time offline/online connectivity sentinel banner | Done | Medium |
 | `CW-46` | Durable Supabase Device Handoff Table with automatic in-memory fallback for cold starts | Done | High |
 | `CW-47` | Vercel Edge Caching & API Rate-Limit Armor for GitHub and health telemetry | Done | Medium |
+| `CW-48` | Dual Environment Switcher: Production vs Staging/Testing mode with localStorage persistence | Done | High |
+| `CW-49` | Read-only Local Source Code Inspector with sandboxed file tree and code viewer | Done | High |
 
 ---
 

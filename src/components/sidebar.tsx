@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Check,
   ChevronsUpDown,
+  Code2,
   Cog,
   Database,
   Home,
@@ -37,6 +38,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
 import ActivityBell from "@/components/activity-bell";
+import EnvironmentSwitcher from "@/components/environment-switcher";
 import PokeballIcon from "@/components/pokeball-icon";
 import ProjectAvatar from "@/components/project-avatar";
 import Avatar from "@/components/settings/avatar";
@@ -64,6 +66,7 @@ const projectNav: { label: string; slug: string; icon: LucideIcon }[] = [
   { label: "System Architecture", slug: "architecture", icon: Landmark },
   { label: "Flowchart / Diagrams", slug: "diagrams", icon: Network },
   { label: "Analytics", slug: "dashboards", icon: BarChart3 },
+  { label: "Source Code", slug: "source", icon: Code2 },
   { label: "Settings", slug: "settings", icon: Settings },
 ];
 
@@ -231,6 +234,8 @@ export default function Sidebar({
           <span className="flex-1 text-left">Device handoff</span>
           <span aria-hidden>📡</span>
         </button>
+
+        <EnvironmentSwitcher />
       </div>
 
       <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-3" aria-label="Main">
