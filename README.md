@@ -180,6 +180,7 @@ collab-workspace/
 | `CW-48` | Dual Environment Switcher: Production vs Staging/Testing mode with localStorage persistence | Done | High |
 | `CW-49` | Read-only Local Source Code Inspector with sandboxed file tree and code viewer | Done | High |
 | `CW-50` | System Runtime Error Sentinel & Diagnostics Debugger Dock with 1-click Copy Diagnostic | Done | High |
+| `CW-51` | Pre-Deployment Verification Gate & Inspection Scorecard with copyable release checklist | Done | High |
 
 ---
 

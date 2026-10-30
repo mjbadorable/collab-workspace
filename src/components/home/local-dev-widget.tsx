@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, ChevronRight, Copy, GitBranch } from "lucide-react";
+import DeploymentGateModal from "@/components/projects/deployment-gate-modal";
 
 type LatestCommit = { shortSha: string; message: string; timeAgo: string };
 
@@ -103,7 +104,7 @@ function FileList({ files, count }: { files: string[]; count: number }) {
   );
 }
 
-function Details({ repo }: { repo: FoundRepo }) {
+function Details({ repo, onPreflight }: { repo: FoundRepo; onPreflight: () => void }) {
   const { latestCommit } = repo;
 
   return (
@@ -133,9 +134,14 @@ function Details({ repo }: { repo: FoundRepo }) {
       {repo.uncommittedCount > 0 && <FileList files={repo.uncommittedFiles} count={repo.uncommittedCount} />}
 
       {!repo.needsPush && repo.uncommittedCount === 0 && (
-        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
-          <span aria-hidden>✓</span> Local git working tree clean &amp; up to date with remote
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2">
+          <p className="text-xs font-medium text-emerald-800">
+            <span aria-hidden>✓</span> Local git working tree clean &amp; up to date with remote
+          </p>
+          <button type="button" onClick={onPreflight} className="text-xs font-semibold text-emerald-900 underline-offset-2 hover:underline">
+            <span aria-hidden>🚦</span> Pre-flight Check
+          </button>
+        </div>
       )}
 
       {latestCommit.shortSha && (
@@ -290,6 +296,7 @@ export default function LocalDevWidget({
   const [expanded, setExpanded] = useState(!collapsible);
   const [active, setActive] = useState("all");
   const [tick, setTick] = useState(0);
+  const [gateOpen, setGateOpen] = useState(false);
 
   const url = showFleetTabs
     ? "/api/local-git-status?all=true"
@@ -326,9 +333,15 @@ export default function LocalDevWidget({
 
   if (!data.isLocal) {
     return (
-      <p className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs text-neutral-600">
-        <span aria-hidden>☁️</span> Cloud Deployment (Vercel)
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs text-neutral-600">
+          <span aria-hidden>☁️</span> Cloud Deployment (Vercel)
+        </p>
+        <button type="button" onClick={() => setGateOpen(true)} className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 shadow-xs hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+            <span aria-hidden>🚦</span> Inspect Deployment Gate
+          </button>
+        <DeploymentGateModal projectId={projectId ?? "collab-workspace"} open={gateOpen} onClose={() => setGateOpen(false)} />
+      </div>
     );
   }
 
@@ -337,6 +350,7 @@ export default function LocalDevWidget({
     const repo = fleet[active];
     return (
       <section aria-label="Local dev engine" className="space-y-3 rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
+        <DeploymentGateModal projectId={active === "all" ? "collab-workspace" : active} open={gateOpen} onClose={() => setGateOpen(false)} />
         <div className="flex flex-wrap items-center gap-2">
           <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
@@ -344,6 +358,11 @@ export default function LocalDevWidget({
           </span>
           <span className="text-sm font-semibold">Local Dev Engine</span>
           <span className="text-[11px] text-neutral-400">fleet monitor · refreshes every 10s</span>
+          <span className="ml-auto">
+          <button type="button" onClick={() => setGateOpen(true)} className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-xs font-medium text-neutral-700 shadow-xs hover:border-red-200 hover:bg-red-50 hover:text-red-700">
+            <span aria-hidden>🚦</span> Inspect Deployment Gate
+          </button>
+          </span>
         </div>
         <FleetTabs fleet={fleet} active={active} onChange={setActive} />
         {active === "all" || !repo ? (
@@ -355,7 +374,7 @@ export default function LocalDevWidget({
             <div className="flex flex-wrap items-center gap-2">
               <RepoHeader repo={repo} name={active} />
             </div>
-            <Details repo={repo} />
+            <Details repo={repo} onPreflight={() => setGateOpen(true)} />
           </div>
         )}
       </section>
@@ -367,6 +386,7 @@ export default function LocalDevWidget({
 
   return (
     <section aria-label="Local dev engine" className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
+      <DeploymentGateModal projectId={projectId ?? "collab-workspace"} open={gateOpen} onClose={() => setGateOpen(false)} />
       {collapsible ? (
         <button
           type="button"
@@ -380,7 +400,7 @@ export default function LocalDevWidget({
       ) : (
         <div className="flex flex-wrap items-center gap-2">{header}</div>
       )}
-      {expanded && <div className="mt-2.5">{data.notFound ? <NotFoundNote /> : <Details repo={data} />}</div>}
+      {expanded && <div className="mt-2.5">{data.notFound ? <NotFoundNote /> : <Details repo={data} onPreflight={() => setGateOpen(true)} />}</div>}
     </section>
   );
 }

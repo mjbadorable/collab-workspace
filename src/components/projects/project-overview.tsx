@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Circle, Diamond, ExternalLink, FileDown, GitFork, Square, type LucideIcon } from "lucide-react";
+import { ArrowRight, Check, Circle, Diamond, ExternalLink, FileDown, GitFork, Rocket, Square, type LucideIcon } from "lucide-react";
 import HealthPill from "@/components/home/health-pill";
 import LiveWorkItems from "@/components/home/live-work-items";
 import LocalDevWidget from "@/components/home/local-dev-widget";
 import { progressOf } from "@/components/home/project-card";
 import ProjectAvatar from "@/components/project-avatar";
+import DeploymentGateModal from "@/components/projects/deployment-gate-modal";
 import ExportReportDialog from "@/components/projects/export-report-dialog";
 import GithubActivity from "@/components/projects/github-activity";
 import ProjectAnalytics from "@/components/projects/project-analytics";
@@ -121,6 +122,7 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
   const mounted = useIsClient();
   const { projects } = useProjects();
   const [exporting, setExporting] = useState(false);
+  const [gateOpen, setGateOpen] = useState(false);
   // The slug fallback keeps an old bookmark (e.g. /projects/collab-workspace-devops-portal) from 404ing.
   const project = projects.find((p) => p.id === projectId) ?? projects.find((p) => slugify(p.name) === projectId);
 
@@ -176,6 +178,9 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
               <ExternalLink className="h-3.5 w-3.5" aria-hidden /> Live App
             </a>
           )}
+          <button type="button" onClick={() => setGateOpen(true)} className={linkClass}>
+            <Rocket className="h-3.5 w-3.5" aria-hidden /> Inspect Deployment Gate
+          </button>
           <button type="button" onClick={() => setExporting(true)} className={linkClass}>
             <FileDown className="h-3.5 w-3.5" aria-hidden /> Export Report
           </button>
@@ -307,6 +312,7 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
 
       {project.id === "collab-workspace" && <SuggestedImprovements projectId={project.id} />}
 
+      <DeploymentGateModal projectId={project.id} open={gateOpen} onClose={() => setGateOpen(false)} />
       <ExportReportDialog project={project} open={exporting} onClose={() => setExporting(false)} />
     </div>
   );
