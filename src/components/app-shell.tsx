@@ -9,6 +9,7 @@ import { ProjectsProvider } from "@/lib/projects-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import CommandPalette from "./command-palette";
 import { ConfettiCanvas } from "./confetti-burst";
+import DebuggerDock from "./debugger-dock";
 import DeviceHandoffModal from "./device-handoff-modal";
 import NetworkStatusBar from "./network-status-bar";
 import { isCode, normalizeCode } from "@/lib/device-handoff";
@@ -190,6 +191,7 @@ function Chrome({ children }: { children: ReactNode }) {
     </div>
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />
     <FocusTimerDock />
+    <DebuggerDock />
     <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     <DeviceHandoffModal
       open={handoffOpen}
