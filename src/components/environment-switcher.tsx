@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { FlaskConical, Rocket } from "lucide-react";
 import { useProjects } from "@/lib/projects-context";
 
@@ -110,6 +111,14 @@ export default function EnvironmentSwitcher() {
             : "No live URL set"
           : `localhost:3000 · localhost:5173${branch ? ` · ${branch}` : ""}`}
       </p>
+      {env === "staging" && (
+        <p className="mt-0.5 px-2 text-[11px] leading-snug text-amber-700">
+          🧪 Staging Mode Active — Smoke Test Runner available in{" "}
+          <Link href={`/projects/${projectId}`} className="font-medium underline-offset-2 hover:underline">
+            Project Overview
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

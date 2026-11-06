@@ -1,7 +1,7 @@
 # Silph DevOps — Collaborative Engineering Portal (`collab-workspace`)
 
 > **Architecture Style:** Cloud-Ready & Local-First Collaborative DevOps Control Plane  
-> **Live Production App:** [https://collab-workspace-mu.vercel.app](https://collab-workspace-mu.vercel.app)  
+> **Live Production App:** [https://www.collabworkspace.dev](https://www.collabworkspace.dev)  
 > **Stack:** Next.js 16 (Turbopack) · React 19 · Tailwind CSS v4 · TypeScript · Supabase (PostgreSQL + RLS) · React Flow (`@xyflow/react`)
 
 ---
@@ -181,6 +181,11 @@ collab-workspace/
 | `CW-49` | Read-only Local Source Code Inspector with sandboxed file tree and code viewer | Done | High |
 | `CW-50` | System Runtime Error Sentinel & Diagnostics Debugger Dock with 1-click Copy Diagnostic | Done | High |
 | `CW-51` | Pre-Deployment Verification Gate & Inspection Scorecard with copyable release checklist | Done | High |
+| `CW-52` | Live Git Diff & Staged Changes Viewer in Source Code Inspector | Done | High |
+| `CW-53` | Staging Feature Verification & Automated Smoke Test Harness | Done | High |
+| `CW-54` | Pre-Deployment Gate & Debugger Webhook Dispatcher for Discord and Slack | Done | High |
+| `CW-55` | Movable Projects & Dynamic Fleet Reordering with Drag-and-Drop and Pin to Top | Done | High |
+| `CW-56` | Sandboxed Local Git Action Executor with 1-Click Push and Remote Fetch | Done | High |
 
 ---
 

@@ -4,7 +4,7 @@ import { supabase } from "./supabase";
 export type Member = { user_id: string; email: string; role: WorkspaceMember["role"]; joined_at: string };
 
 // Where an invitee goes to create an account / sign in.
-export const INVITE_LINK = "https://collab-workspace-mu.vercel.app/login";
+export const INVITE_LINK = "https://www.collabworkspace.dev/login";
 
 const inviteErrors: Record<string, string> = {
   user_not_found: "User not found. Ask your friend to create an account first, then invite them.",

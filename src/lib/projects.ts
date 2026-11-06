@@ -84,7 +84,7 @@ export const COLLAB_WORKSPACE_PROJECT: ProjectRecord = {
   icon: "pokeball",
   is_public: true,
   github_url: "https://github.com/mjbadorable/collab-workspace",
-  live_url: "https://collab-workspace-mu.vercel.app",
+  live_url: "https://www.collabworkspace.dev",
   functions: [
     "Multi-project monitoring and control plane with dynamic sidebar trees",
     "Plug-and-play GitHub repository breakdown with auto-generated tasks and stack detection",

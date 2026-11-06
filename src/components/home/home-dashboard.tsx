@@ -27,6 +27,7 @@ import HealthPill from "./health-pill";
 import LiveWorkItems from "./live-work-items";
 import LocalDevWidget from "./local-dev-widget";
 import ProjectCard from "./project-card";
+import { ProjectMoveControls } from "./project-move-controls";
 import StandupDialog from "./standup-dialog";
 
 const launchpad = (projectId: string) => [
@@ -187,6 +188,7 @@ function Portfolio({ projects, workspaceId }: { projects: ProjectRecord[]; works
             <div className="flex items-center gap-2">
               <ProjectAvatar project={p} className="h-8 w-8 text-sm" />
               <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.name}</span>
+              <ProjectMoveControls projectId={p.id} name={p.name} />
               <span className="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-xs text-neutral-600">
                 {p.identifier}
               </span>

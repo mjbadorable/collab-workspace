@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Check, CircleAlert, ClipboardCopy, Loader2, MinusCircle, RotateCw, TriangleAlert, X } from "lucide-react";
+import { PushNowButton } from "@/components/projects/git-action-controls";
 import { useProjects } from "@/lib/projects-context";
+import { GIT_REFRESH_EVENT } from "@/lib/use-git-action";
+import { getWebhookUrl, isWebhookUrl, sendWebhookAlert, setWebhookUrl } from "@/lib/webhook";
 
 type GitRepo = {
   branch: string;
@@ -21,7 +25,7 @@ type Snapshot = { git: GitState; health: HealthState };
 
 type CheckStatus = "pass" | "warn" | "fail" | "skip";
 
-type Check = { id: string; title: string; status: CheckStatus; detail: string };
+type Check = { id: string; title: string; status: CheckStatus; detail: string; action?: { label: string; href: string }; pushable?: boolean };
 
 const MAIN_BRANCHES = ["main", "master"];
 const CLOUD_NOTICE = "Live Git telemetry available in local dev environment";
@@ -54,7 +58,7 @@ async function readHealth(liveUrl: string | null | undefined, signal: AbortSigna
   }
 }
 
-function evaluate({ git, health }: Snapshot): Check[] {
+function evaluate({ git, health }: Snapshot, projectId: string): Check[] {
   const gitSkip = (detail: string) => ({ status: "skip" as const, detail });
   const unavailable = git.kind === "cloud" ? CLOUD_NOTICE : git.kind === "missing" ? "No git repository for this project was found on this machine" : "Git status could not be read";
 
@@ -63,14 +67,18 @@ function evaluate({ git, health }: Snapshot): Check[] {
       ? gitSkip(unavailable)
       : git.repo.uncommittedCount === 0
         ? { status: "pass", detail: "Working tree clean" }
-        : { status: "fail", detail: `${plural(git.repo.uncommittedCount, "uncommitted file")}: commit or stash before shipping` };
+        : {
+            status: "fail",
+            detail: `${plural(git.repo.uncommittedCount, "uncommitted file")}: commit or stash before shipping`,
+            action: { label: "Inspect Diffs in Source Inspector →", href: `/projects/${projectId}/source?tab=changes` },
+          };
 
   const sync: Omit<Check, "id" | "title"> =
     git.kind !== "found"
       ? gitSkip(unavailable)
       : git.repo.unpushedCount === 0
         ? { status: "pass", detail: "Local branch matches its remote" }
-        : { status: "fail", detail: `${plural(git.repo.unpushedCount, "commit")} not pushed to origin/${git.repo.branch}` };
+        : { status: "fail", detail: `${plural(git.repo.unpushedCount, "commit")} not pushed to origin/${git.repo.branch}`, pushable: true };
 
   const target: Omit<Check, "id" | "title"> =
     health.kind === "no-url"
@@ -148,6 +156,11 @@ function GateDialog({ projectId, onClose }: { projectId: string; onClose: () => 
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [run, setRun] = useState(0);
   const [copied, setCopied] = useState(false);
+  // The dialog mounts only after a click, so reading localStorage in the initializer cannot mismatch a server render.
+  const [webhook, setWebhook] = useState(() => getWebhookUrl(projectId));
+  const [asking, setAsking] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [dispatch, setDispatch] = useState<{ state: "idle" | "sending" | "sent" | "error"; error?: string }>({ state: "idle" });
 
   // Native <dialog> gives focus trapping, Esc-to-close and an inert page behind it.
   useEffect(() => {
@@ -163,7 +176,14 @@ function GateDialog({ projectId, onClose }: { projectId: string; onClose: () => 
     return () => controller.abort();
   }, [projectId, liveUrl, run]);
 
-  const checks = snapshot ? evaluate(snapshot) : null;
+  // A push or fetch started from the gate (or anywhere on the page) re-runs the checks without blanking them.
+  useEffect(() => {
+    const onRefresh = () => setRun((n) => n + 1);
+    window.addEventListener(GIT_REFRESH_EVENT, onRefresh);
+    return () => window.removeEventListener(GIT_REFRESH_EVENT, onRefresh);
+  }, []);
+
+  const checks = snapshot ? evaluate(snapshot, projectId) : null;
   const verdict = checks ? verdictOf(checks) : null;
 
   const copyChecklist = async () => {
@@ -175,6 +195,35 @@ function GateDialog({ projectId, onClose }: { projectId: string; onClose: () => 
     } catch {
       // Clipboard blocked: nothing to confirm.
     }
+  };
+
+  const dispatchVerdict = async (url: string) => {
+    if (!checks || !verdict) return;
+    setDispatch({ state: "sending" });
+    const error = await sendWebhookAlert({
+      webhookUrl: url,
+      projectName: project?.name ?? projectId,
+      title: `Deployment Gate Verdict: ${verdict.label}`,
+      message: checklistMarkdown(project?.name ?? projectId, liveUrl, checks, verdict),
+      state: verdict.tone === "ready" ? "online" : verdict.tone === "blocked" ? "offline" : "info",
+    });
+    if (error) return setDispatch({ state: "error", error });
+    setDispatch({ state: "sent" });
+    window.setTimeout(() => setDispatch({ state: "idle" }), 2500);
+  };
+
+  const onSendClick = () => {
+    if (webhook) void dispatchVerdict(webhook);
+    else setAsking((a) => !a);
+  };
+
+  const saveAndSend = () => {
+    const url = draft.trim();
+    if (!isWebhookUrl(url)) return setDispatch({ state: "error", error: "Use an https Discord (discord.com) or Slack (hooks.slack.com) webhook URL." });
+    setWebhookUrl(projectId, url);
+    setWebhook(url);
+    setAsking(false);
+    void dispatchVerdict(url);
   };
 
   return (
@@ -233,6 +282,16 @@ function GateDialog({ projectId, onClose }: { projectId: string; onClose: () => 
                 <span className="min-w-0">
                   <span className="block text-sm font-medium text-neutral-900">{check.title}</span>
                   <span className="block text-xs text-neutral-500">{check.detail}</span>
+                  {check.pushable && (
+                    <span className="mt-1.5 block">
+                      <PushNowButton projectId={projectId} label="🚀 Push Now" />
+                    </span>
+                  )}
+                  {check.action && (
+                    <Link href={check.action.href} onClick={() => ref.current?.close()} className="mt-1 inline-block text-xs font-medium text-red-600 hover:underline">
+                      {check.action.label}
+                    </Link>
+                  )}
                 </span>
               </li>
             );
@@ -240,7 +299,34 @@ function GateDialog({ projectId, onClose }: { projectId: string; onClose: () => 
         </ul>
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-neutral-200 px-5 py-3">
+      {asking && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveAndSend();
+          }}
+          className="flex gap-2 border-t border-neutral-200 px-5 py-3"
+        >
+          <input
+            type="url"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="https://discord.com/api/webhooks/… or https://hooks.slack.com/…"
+            aria-label="Discord or Slack webhook URL"
+            className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+          />
+          <button type="submit" className="shrink-0 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700">
+            Save &amp; send
+          </button>
+        </form>
+      )}
+      {dispatch.state === "error" && (
+        <p role="alert" className="border-t border-red-100 bg-red-50 px-5 py-2 text-xs text-red-700">
+          {dispatch.error}
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-5 py-3">
         <button
           type="button"
           onClick={() => {
@@ -250,6 +336,15 @@ function GateDialog({ projectId, onClose }: { projectId: string; onClose: () => 
           className="flex items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
         >
           <RotateCw className="h-3.5 w-3.5" aria-hidden /> Re-run
+        </button>
+        <button
+          type="button"
+          onClick={onSendClick}
+          disabled={!checks || dispatch.state === "sending"}
+          className="flex items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+        >
+          {dispatch.state === "sending" ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <span aria-hidden>📢</span>}
+          {dispatch.state === "sent" ? "Dispatched ✓" : "Send to Webhook"}
         </button>
         <button
           type="button"

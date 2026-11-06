@@ -3,6 +3,9 @@ export type AlertState = "online" | "offline" | "info";
 
 const key = (projectId: string) => `collab-workspace:webhook:${projectId}`;
 
+// The same hosts the server route accepts; it still re-checks every URL before sending.
+export const isWebhookUrl = (url: string) => /^https:\/\/(discord(app)?\.com|hooks\.slack\.com)\//i.test(url);
+
 export function getWebhookUrl(projectId: string): string {
   try {
     return localStorage.getItem(key(projectId)) ?? "";

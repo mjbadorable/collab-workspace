@@ -10,6 +10,7 @@ import {
   useSentinelEvents,
   type SentinelEvent,
 } from "@/lib/error-sentinel";
+import { getWebhookUrl, isWebhookUrl, sendWebhookAlert, setWebhookUrl } from "@/lib/webhook";
 import { useEnvironment } from "./environment-switcher";
 
 const BADGE: Record<SentinelEvent["kind"], { label: string; className: string }> = {
@@ -28,6 +29,9 @@ export default function DebuggerDock() {
   const [open, setOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [alert, setAlert] = useState<{ state: "idle" | "sending" | "sent" | "error"; error?: string }>({ state: "idle" });
 
   useEffect(() => startErrorSentinel(), []);
 
@@ -51,6 +55,37 @@ export default function DebuggerDock() {
     } catch {
       // Clipboard blocked (insecure context or denied permission): nothing to confirm.
     }
+  };
+
+  // Discord and Slack text is cut off at 1500 characters on the server, so the alert is a short summary, not the full report.
+  const dispatchAlert = async (url: string) => {
+    setAlert({ state: "sending" });
+    const lines = events.slice(0, 5).map((e) => `• [${e.kind}${e.status ? ` ${e.status}` : ""}] ${e.message} (${e.source || e.route})`);
+    const more = events.length > 5 ? [`…and ${events.length - 5} more`] : [];
+    const error = await sendWebhookAlert({
+      webhookUrl: url,
+      projectName: "collab-workspace",
+      title: `Runtime issues: ${events.length} captured (${env ?? "unknown"})`,
+      message: [...lines, ...more].join("\n"),
+      state: "offline",
+    });
+    if (error) return setAlert({ state: "error", error });
+    setAlert({ state: "sent" });
+    window.setTimeout(() => setAlert({ state: "idle" }), 2500);
+  };
+
+  const alertTeam = () => {
+    const url = getWebhookUrl("collab-workspace");
+    if (url) void dispatchAlert(url);
+    else setAsking((a) => !a);
+  };
+
+  const saveAndAlert = () => {
+    const url = draft.trim();
+    if (!isWebhookUrl(url)) return setAlert({ state: "error", error: "Use an https Discord (discord.com) or Slack (hooks.slack.com) webhook URL." });
+    setWebhookUrl("collab-workspace", url);
+    setAsking(false);
+    void dispatchAlert(url);
   };
 
   return (
@@ -108,6 +143,14 @@ export default function DebuggerDock() {
               </button>
               <button
                 type="button"
+                onClick={alertTeam}
+                disabled={count === 0 || alert.state === "sending"}
+                className="flex items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+              >
+                <span aria-hidden>📢</span> {alert.state === "sent" ? "Alerted ✓" : "Alert Team"}
+              </button>
+              <button
+                type="button"
                 onClick={() => recordSentinelEvent({ kind: "diagnostic", message: "Test diagnostic event triggered from the debugger dock", stack: new Error("Test diagnostic").stack })}
                 className="flex items-center gap-1.5 rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
               >
@@ -125,6 +168,33 @@ export default function DebuggerDock() {
                 <Trash2 className="h-3.5 w-3.5" /> Clear Log
               </button>
             </div>
+
+            {asking && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  saveAndAlert();
+                }}
+                className="flex gap-2 border-b border-neutral-200 px-4 py-2"
+              >
+                <input
+                  type="url"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  placeholder="Discord or Slack webhook URL"
+                  aria-label="Discord or Slack webhook URL"
+                  className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+                />
+                <button type="submit" className="shrink-0 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700">
+                  Save &amp; send
+                </button>
+              </form>
+            )}
+            {alert.state === "error" && (
+              <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
+                {alert.error}
+              </p>
+            )}
 
             <ul className="min-h-0 flex-1 divide-y divide-neutral-100 overflow-y-auto">
               {count === 0 && <li className="px-4 py-10 text-center text-sm text-neutral-400">Nothing to report. Errors and failed requests will appear here.</li>}

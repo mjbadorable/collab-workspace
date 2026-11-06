@@ -103,6 +103,11 @@ export function seedItems(projectId: string): StoredWorkItem[] {
       seed(49, "Read-only Local Source Code Inspector with sandboxed file tree and code viewer", "done", "high", mockUser.id),
       seed(50, "System Runtime Error Sentinel & Diagnostics Debugger Dock with 1-click Copy Diagnostic", "done", "high", mockUser.id),
       seed(51, "Pre-Deployment Verification Gate & Inspection Scorecard with copyable release checklist", "done", "high", mockUser.id),
+      seed(52, "Live Git Diff & Staged Changes Viewer in Source Code Inspector", "done", "high", mockUser.id),
+      seed(53, "Staging Feature Verification & Automated Smoke Test Harness", "done", "high", mockUser.id),
+      seed(54, "Pre-Deployment Gate & Debugger Webhook Dispatcher for Discord and Slack", "done", "high", mockUser.id),
+      seed(55, "Movable Projects & Dynamic Fleet Reordering with Drag-and-Drop and Pin to Top", "done", "high", mockUser.id),
+      seed(56, "Sandboxed Local Git Action Executor with 1-Click Push and Remote Fetch", "done", "high", mockUser.id),
     ];
   }
 
@@ -129,7 +134,7 @@ export function seedItems(projectId: string): StoredWorkItem[] {
   ];
 }
 
-const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v14";
+const NEXTGEN_FLAG = "collab-workspace:cw-nextgen-seeded-v18";
 
 // Earlier wordings of seed titles, so a board that already holds the old title is not given a duplicate.
 export const SEED_TITLE_ALIASES: Record<string, string[]> = {

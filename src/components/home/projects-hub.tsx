@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type DragEvent } from "react";
 import Link from "next/link";
 import { ExternalLink, FolderKanban, GitFork, Plus, Search, Users } from "lucide-react";
 import ProjectAvatar from "@/components/project-avatar";
@@ -9,18 +9,37 @@ import type { ProjectRecord } from "@/lib/projects";
 import LiveWorkItems from "./live-work-items";
 import { progressOf } from "./project-card";
 import HealthPill from "./health-pill";
+import { ProjectGrip, ProjectMoveControls } from "./project-move-controls";
 import { Dossier, DossierSelector, FleetTechMatrix } from "./pokedex-dossier";
 
 type Tab = "all" | "joined";
 
-function HubCard({ project }: { project: ProjectRecord }) {
+type DragProps = {
+  dragging: boolean;
+  over: boolean;
+  onDragStart: (e: DragEvent<HTMLDivElement>) => void;
+  onDragOver: (e: DragEvent<HTMLDivElement>) => void;
+  onDrop: (e: DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
+};
+
+function HubCard({ project, drag }: { project: ProjectRecord; drag: DragProps }) {
   return (
+    <div
+      draggable
+      onDragStart={drag.onDragStart}
+      onDragOver={drag.onDragOver}
+      onDrop={drag.onDrop}
+      onDragEnd={drag.onDragEnd}
+      className={`rounded-lg transition ${drag.dragging ? "scale-98 opacity-50" : ""} ${drag.over ? "ring-2 ring-red-500" : ""}`}
+    >
     <LiveWorkItems projectId={project.id} fallback={<div className="h-56 rounded-lg border border-neutral-200 bg-white" />}>
       {(items) => {
         const { total, done, percent } = progressOf(items);
         return (
-          <div className="flex flex-col rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+          <div className="flex h-full flex-col rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
             <div className="flex items-start gap-3">
+              <ProjectGrip projectId={project.id} name={project.name} />
               <ProjectAvatar project={project} />
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-sm font-semibold">{project.name}</h3>
@@ -28,7 +47,8 @@ function HubCard({ project }: { project: ProjectRecord }) {
                   {project.identifier}
                 </span>
               </div>
-              <div className="flex gap-1 text-neutral-400">
+              <div className="flex items-center gap-1 text-neutral-400">
+                <ProjectMoveControls projectId={project.id} name={project.name} />
                 {project.github_url && (
                   <a href={project.github_url} target="_blank" rel="noopener noreferrer" aria-label="GitHub repository" className="rounded p-1 hover:bg-neutral-100 hover:text-neutral-700">
                     <GitFork className="h-4 w-4" aria-hidden />
@@ -74,34 +94,44 @@ function HubCard({ project }: { project: ProjectRecord }) {
               </div>
             )}
 
-            <div className="mt-4 flex items-center gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
-              <span className="rounded-full border border-neutral-200 px-2 py-0.5">{project.is_public ? "Public" : "Private"}</span>
-              <span className="flex items-center gap-1">
-                <Users className="h-3 w-3" aria-hidden /> 1 member
-              </span>
-              <span className="flex-1" />
-              <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700">Admin</span>
-              <Link
-                href={`/projects/${project.id}`}
-                className="rounded-md bg-red-600 px-2.5 py-1 font-medium text-white hover:bg-red-700"
-              >
-                Open
-              </Link>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
+              <div className="flex items-center gap-2">
+                <span className="rounded-full border border-neutral-200 px-2 py-0.5">{project.is_public ? "Public" : "Private"}</span>
+                <span className="flex items-center gap-1">
+                  <Users className="h-3 w-3" aria-hidden /> 1 member
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700">Admin</span>
+                <Link
+                  href={`/projects/${project.id}`}
+                  className="rounded-md bg-red-600 px-2.5 py-1 font-medium text-white hover:bg-red-700"
+                >
+                  Open
+                </Link>
+              </div>
             </div>
           </div>
         );
       }}
     </LiveWorkItems>
+    </div>
   );
 }
 
 export default function ProjectsHub() {
-  const { projects, openCreateDialog, syncError } = useProjects();
+  const { projects, openCreateDialog, syncError, reorderProjects } = useProjects();
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<Tab>("all");
   const [view, setView] = useState<"cards" | "dossier">("cards");
   const [dossierId, setDossierId] = useState<string | null>(null);
   const q = query.trim().toLowerCase();
+  const endDrag = () => {
+    setDragId(null);
+    setOverId(null);
+  };
 
   // There is no per-project membership yet: every project you can see is one you've joined.
   const joined = projects;
@@ -201,7 +231,34 @@ export default function ProjectsHub() {
       ) : (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {shown.map((p) => (
-            <HubCard key={p.id} project={p} />
+            <HubCard
+              key={p.id}
+              project={p}
+              drag={{
+                dragging: dragId === p.id,
+                over: overId === p.id && dragId !== null && dragId !== p.id,
+                onDragStart: (e) => {
+                  e.dataTransfer.effectAllowed = "move";
+                  e.dataTransfer.setData("text/plain", p.id);
+                  setDragId(p.id);
+                },
+                onDragOver: (e) => {
+                  if (!dragId) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  if (overId !== p.id) setOverId(p.id);
+                },
+                onDrop: (e) => {
+                  e.preventDefault();
+                  // Indices are in the full fleet order, not the filtered view.
+                  const from = projects.findIndex((x) => x.id === dragId);
+                  const to = projects.findIndex((x) => x.id === p.id);
+                  if (from >= 0 && to >= 0) reorderProjects(from, to);
+                  endDrag();
+                },
+                onDragEnd: endDrag,
+              }}
+            />
           ))}
         </div>
       )}

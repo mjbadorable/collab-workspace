@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Check, ChevronDown, ChevronRight, Copy, GitBranch } from "lucide-react";
 import DeploymentGateModal from "@/components/projects/deployment-gate-modal";
+import { PushNowButton } from "@/components/projects/git-action-controls";
+import { GIT_REFRESH_EVENT } from "@/lib/use-git-action";
 
 type LatestCommit = { shortSha: string; message: string; timeAgo: string };
 
@@ -104,7 +106,7 @@ function FileList({ files, count }: { files: string[]; count: number }) {
   );
 }
 
-function Details({ repo, onPreflight }: { repo: FoundRepo; onPreflight: () => void }) {
+function Details({ repo, projectId, onPreflight }: { repo: FoundRepo; projectId: string; onPreflight: () => void }) {
   const { latestCommit } = repo;
 
   return (
@@ -119,7 +121,10 @@ function Details({ repo, onPreflight }: { repo: FoundRepo; onPreflight: () => vo
             <p className="text-xs font-semibold text-amber-900">
               <span aria-hidden>⚡</span> {plural(repo.unpushedCount, "local commit")} need push to origin/{repo.branch}
             </p>
-            <CopyPushButton command={pushCommand(repo)} />
+            <div className="flex flex-wrap items-center gap-2">
+              <PushNowButton projectId={projectId} />
+              <CopyPushButton command={pushCommand(repo)} />
+            </div>
           </div>
           <ul className="mt-1.5 space-y-0.5 font-mono text-[11px] text-amber-800">
             {repo.unpushedCommits.map((commit) => (
@@ -233,7 +238,8 @@ function FleetGrid({ fleet, onPick }: { fleet: Record<string, RepoStatus>; onPic
                     {plural(repo.uncommittedCount, "uncommitted file")}
                   </span>
                 </div>
-                <div className="mt-auto pt-1">
+                <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+                  {repo.needsPush && <PushNowButton projectId={id} label="🚀 Push now" />}
                   <CopyPushButton command={pushCommand(repo)} urgent={repo.needsPush} />
                 </div>
               </>
@@ -312,9 +318,13 @@ export default function LocalDevWidget({
     }, POLL_INTERVAL_MS);
     const onVisible = () => document.visibilityState === "visible" && setTick((n) => n + 1);
     document.addEventListener("visibilitychange", onVisible);
+    // A push or fetch from this page re-reads the repo straight away.
+    const onRefresh = () => setTick((n) => n + 1);
+    window.addEventListener(GIT_REFRESH_EVENT, onRefresh);
     return () => {
       clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener(GIT_REFRESH_EVENT, onRefresh);
     };
   }, []);
 
@@ -374,7 +384,7 @@ export default function LocalDevWidget({
             <div className="flex flex-wrap items-center gap-2">
               <RepoHeader repo={repo} name={active} />
             </div>
-            <Details repo={repo} onPreflight={() => setGateOpen(true)} />
+            <Details repo={repo} projectId={active} onPreflight={() => setGateOpen(true)} />
           </div>
         )}
       </section>
@@ -400,7 +410,7 @@ export default function LocalDevWidget({
       ) : (
         <div className="flex flex-wrap items-center gap-2">{header}</div>
       )}
-      {expanded && <div className="mt-2.5">{data.notFound ? <NotFoundNote /> : <Details repo={data} onPreflight={() => setGateOpen(true)} />}</div>}
+      {expanded && <div className="mt-2.5">{data.notFound ? <NotFoundNote /> : <Details repo={data} projectId={projectId ?? "collab-workspace"} onPreflight={() => setGateOpen(true)} />}</div>}
     </section>
   );
 }

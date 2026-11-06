@@ -47,6 +47,7 @@ import { roleTone, useProfile } from "@/lib/profile-context";
 import { useProjects } from "@/lib/projects-context";
 import { useTheme } from "@/lib/theme";
 import { useWorkspacePermissions } from "@/lib/use-permissions";
+import { useIsClient } from "@/lib/use-is-client";
 
 const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Home", href: "/", icon: Home },
@@ -101,6 +102,7 @@ export default function Sidebar({
   const { projects, currentProject, getProjectDiagrams, openCreateDialog } = useProjects();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const { user, loading, signOut } = useAuth();
+  const mounted = useIsClient();
   const { theme, toggleTheme } = useTheme();
   const { workspaces, current, select } = useWorkspaces();
   // The server also rejects non-admin invites; hiding the menu item just avoids a dead end.
@@ -346,7 +348,7 @@ export default function Sidebar({
       </nav>
 
       <div className="border-t border-neutral-200 p-3">
-        {loading ? (
+        {!mounted || loading ? (
           <div className="h-12" aria-hidden />
         ) : (
           <div>

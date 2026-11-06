@@ -20,7 +20,18 @@ import {
   type ProjectInput,
   type ProjectRecord,
 } from "./projects";
+import {
+  loadProjectOrder,
+  moveProjectId,
+  reorderProjectIds,
+  saveProjectOrder,
+  sortProjectsByOrder,
+  subscribeProjectOrder,
+  type MoveDirection,
+} from "./projects-order";
 import { useStorageTarget } from "./storage-target";
+
+const NO_ORDER: string[] = [];
 
 type ProjectsContext = {
   projects: ProjectRecord[];
@@ -28,6 +39,8 @@ type ProjectsContext = {
   createProject: (input: ProjectInput) => ProjectRecord;
   updateProject: (id: string, patch: Partial<Omit<ProjectRecord, "id" | "created_at">>) => void;
   deleteProject: (id: string) => void;
+  reorderProjects: (fromIndex: number, toIndex: number) => void;
+  moveProject: (id: string, direction: MoveDirection) => void;
   getProjectDiagrams: (projectId: string) => ProjectDiagram[];
   openCreateDialog: () => void;
   // Last failed cloud mirror (e.g. supabase/projects.sql not run yet). The local copy is always saved.
@@ -44,7 +57,9 @@ export function useProjects(): ProjectsContext {
 
 // Reads the pathname, so it must sit under a Suspense boundary (AppShell provides one).
 export function ProjectsProvider({ children }: { children: ReactNode }) {
-  const projects = useSyncExternalStore(subscribeProjects, getProjects, () => SEED_PROJECTS);
+  const stored = useSyncExternalStore(subscribeProjects, getProjects, () => SEED_PROJECTS);
+  const order = useSyncExternalStore(subscribeProjectOrder, loadProjectOrder, () => NO_ORDER);
+  const projects = useMemo(() => sortProjectsByOrder(stored, order), [stored, order]);
   const pathname = usePathname();
   const target = useStorageTarget();
   const workspaceId = target.mode === "cloud" ? target.workspaceId : null;
@@ -113,6 +128,17 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     [mirror]
   );
 
+  // Indices refer to the full, currently sorted list. The result is saved as a complete id list.
+  const reorderProjects = useCallback((fromIndex: number, toIndex: number) => {
+    const ids = sortProjectsByOrder(getProjects(), loadProjectOrder()).map((p) => p.id);
+    saveProjectOrder(reorderProjectIds(ids, fromIndex, toIndex));
+  }, []);
+
+  const moveProject = useCallback((id: string, direction: MoveDirection) => {
+    const ids = sortProjectsByOrder(getProjects(), loadProjectOrder()).map((p) => p.id);
+    saveProjectOrder(moveProjectId(ids, id, direction));
+  }, []);
+
   const openCreateDialog = useCallback(() => setCreateOpen(true), []);
 
   const value = useMemo(
@@ -122,11 +148,13 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
       createProject,
       updateProject,
       deleteProject,
+      reorderProjects,
+      moveProject,
       getProjectDiagrams,
       openCreateDialog,
       syncError,
     }),
-    [projects, currentProject, createProject, updateProject, deleteProject, openCreateDialog, syncError]
+    [projects, currentProject, createProject, updateProject, deleteProject, reorderProjects, moveProject, openCreateDialog, syncError]
   );
 
   return (

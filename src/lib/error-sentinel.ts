@@ -56,6 +56,9 @@ const subscribe = (onChange: () => void) => {
   };
 };
 
+// The current log outside React, for code that runs on demand (newest first).
+export const getSentinelEvents = (): readonly SentinelEvent[] => events;
+
 // Newest first. Empty during server render and hydration.
 export function useSentinelEvents(): readonly SentinelEvent[] {
   return useSyncExternalStore(subscribe, () => events, () => EMPTY);
@@ -77,6 +80,12 @@ const urlOf = (input: RequestInfo | URL): string => {
   return input.url;
 };
 
+// Requests that expect a failing answer (the smoke tests probing an endpoint) send this header to stay out of the log.
+export const SENTINEL_IGNORE_HEADER = "x-sentinel-ignore";
+
+const isIgnored = (input: RequestInfo | URL, init: RequestInit | undefined) =>
+  new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined)).has(SENTINEL_IGNORE_HEADER);
+
 const isAbort = (reason: unknown) => reason instanceof DOMException && reason.name === "AbortError";
 
 // Attaches the window listeners and a pass-through fetch wrapper. Every handler only observes: nothing calls
@@ -97,6 +106,7 @@ export function startErrorSentinel(): () => void {
 
   const originalFetch = window.fetch;
   const wrapped: typeof window.fetch = async (input, init) => {
+    if (isIgnored(input, init)) return originalFetch.call(window, input, init);
     try {
       const response = await originalFetch.call(window, input, init);
       if (!response.ok) {

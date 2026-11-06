@@ -7,7 +7,10 @@ import HealthPill from "@/components/home/health-pill";
 import LiveWorkItems from "@/components/home/live-work-items";
 import LocalDevWidget from "@/components/home/local-dev-widget";
 import { progressOf } from "@/components/home/project-card";
+import { useEnvironment } from "@/components/environment-switcher";
 import ProjectAvatar from "@/components/project-avatar";
+import SmokeTestRunner from "@/components/projects/smoke-test-runner";
+import { GitActionMenu } from "@/components/projects/git-action-controls";
 import DeploymentGateModal from "@/components/projects/deployment-gate-modal";
 import ExportReportDialog from "@/components/projects/export-report-dialog";
 import GithubActivity from "@/components/projects/github-activity";
@@ -123,6 +126,7 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
   const { projects } = useProjects();
   const [exporting, setExporting] = useState(false);
   const [gateOpen, setGateOpen] = useState(false);
+  const [environment] = useEnvironment();
   // The slug fallback keeps an old bookmark (e.g. /projects/collab-workspace-devops-portal) from 404ing.
   const project = projects.find((p) => p.id === projectId) ?? projects.find((p) => slugify(p.name) === projectId);
 
@@ -181,6 +185,7 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
           <button type="button" onClick={() => setGateOpen(true)} className={linkClass}>
             <Rocket className="h-3.5 w-3.5" aria-hidden /> Inspect Deployment Gate
           </button>
+          <GitActionMenu projectId={project.id} className={linkClass} />
           <button type="button" onClick={() => setExporting(true)} className={linkClass}>
             <FileDown className="h-3.5 w-3.5" aria-hidden /> Export Report
           </button>
@@ -214,6 +219,8 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
           )}
         </div>
       </section>
+
+      {environment === "staging" && <SmokeTestRunner key={`staging-smoke-${project.id}`}projectId={project.id} />}
 
       <section aria-labelledby="ov-stack">
         <h2 id="ov-stack" className="text-sm font-semibold text-neutral-700">
@@ -263,7 +270,7 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
 
       <GithubActivity githubUrl={project.github_url} liveUrl={project.live_url} />
 
-      <FlowchartPipeline key={project.id} projectId={project.id} />
+      <FlowchartPipeline key={`pipeline-${project.id}`}projectId={project.id} />
 
       <ProjectAnalytics projectId={project.id} />
 
