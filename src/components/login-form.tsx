@@ -18,7 +18,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
+import { isLocalHost } from "./auth-gate";
 import PokeballIcon from "./pokeball-icon";
+import { useIsClient } from "@/lib/use-is-client";
 
 type Mode = "signin" | "signup";
 
@@ -157,6 +159,8 @@ function PasswordChecklist({ password }: { password: string }) {
 export default function LoginForm() {
   const router = useRouter();
   const { user } = useAuth();
+  // Local preview skips sign-in, so it is only offered on localhost; elsewhere the auth gate would bounce it back here.
+  const showLocalPreview = useIsClient() && isLocalHost();
   const [mode, setMode] = useState<Mode>("signin");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -327,7 +331,7 @@ export default function LoginForm() {
           </div>
           <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
             <h1 className="text-lg font-semibold">Welcome to Collab Workspace</h1>
-            <p className="mt-1 text-sm text-neutral-500">Sign in to sync your workspace, or continue in local preview.</p>
+            <p className="mt-1 text-sm text-neutral-500">{showLocalPreview ? "Sign in to sync your workspace, or continue in local preview." : "Sign in to open your workspace."}</p>
 
             {!supabase ? (
               <p role="alert" className="mt-5 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -421,9 +425,11 @@ export default function LoginForm() {
               </>
             )}
 
-            <Link href="/" className="mt-5 block text-center text-sm text-neutral-500 hover:text-neutral-900">
-              Continue with local preview
-            </Link>
+            {showLocalPreview && (
+              <Link href="/" className="mt-5 block text-center text-sm text-neutral-500 hover:text-neutral-900">
+                Continue with local preview
+              </Link>
+            )}
           </div>
           <p className="mt-6 flex items-center gap-1.5 text-center text-xs text-neutral-500">
             <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden />

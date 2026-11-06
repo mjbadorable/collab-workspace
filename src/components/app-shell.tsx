@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { ProfileProvider } from "@/lib/profile-context";
 import { ProjectsProvider } from "@/lib/projects-context";
 import { WorkspaceProvider } from "@/lib/workspace-context";
+import AuthGate from "./auth-gate";
 import CommandPalette from "./command-palette";
 import { ConfettiCanvas } from "./confetti-burst";
 import DebuggerDock from "./debugger-dock";
@@ -33,7 +34,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
         {/* usePathname() below is request-time data on dynamic routes, so it must sit under Suspense. */}
         <Suspense fallback={<div className="h-screen" />}>
           <ProjectsProvider>
-            <Chrome>{children}</Chrome>
+            <AuthGate>
+              <Chrome>{children}</Chrome>
+            </AuthGate>
           </ProjectsProvider>
         </Suspense>
       </WorkspaceProvider>
