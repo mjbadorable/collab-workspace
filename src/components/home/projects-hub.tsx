@@ -3,6 +3,7 @@
 import { useState, type DragEvent } from "react";
 import Link from "next/link";
 import { ExternalLink, FolderKanban, GitFork, Plus, Search, Users } from "lucide-react";
+import PrivateBadge from "@/components/private-badge";
 import ProjectAvatar from "@/components/project-avatar";
 import { useProjects } from "@/lib/projects-context";
 import type { ProjectRecord } from "@/lib/projects";
@@ -44,8 +45,9 @@ function HubCard({ project, drag }: { project: ProjectRecord; drag: DragProps })
               <ProjectAvatar project={project} />
               <div className="min-w-0 flex-1">
                 <h3 className="truncate text-sm font-semibold">{project.name}</h3>
-                <span className="mt-1 inline-block rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-xs text-neutral-600">
-                  {project.identifier}
+                <span className="mt-1 flex flex-wrap items-center gap-1.5">
+                  <span className="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-xs text-neutral-600">{project.identifier}</span>
+                  <PrivateBadge project={project} />
                 </span>
               </div>
               <div className="flex items-center gap-1 text-neutral-400">

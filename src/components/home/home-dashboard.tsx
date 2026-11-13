@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { ACTIVITY_ICONS, timeAgo } from "@/components/activity-bell";
 import Greeting from "@/components/greeting";
+import PrivateBadge from "@/components/private-badge";
 import ProjectAvatar from "@/components/project-avatar";
 import DeploymentGateModal from "@/components/projects/deployment-gate-modal";
 import { priorityOptions } from "@/components/work-items/work-items-view";
@@ -115,6 +116,7 @@ function PortfolioRow({ project, items }: { project: ProjectRecord; items: Store
             {project.name}
           </Link>
           <span className="shrink-0 rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-[11px] text-neutral-600">{project.identifier}</span>
+          <PrivateBadge project={project} />
         </div>
         <p className="mt-0.5 line-clamp-1 text-xs text-neutral-500">{project.description || "No description yet."}</p>
       </div>

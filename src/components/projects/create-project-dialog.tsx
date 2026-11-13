@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { GitFork, Loader2, Sparkles } from "lucide-react";
+import { GitFork, KeyRound, Loader2, Lock, Sparkles } from "lucide-react";
 import PokeballIcon from "@/components/pokeball-icon";
 import { logActivity } from "@/lib/activity-log";
 import { useAuth } from "@/lib/auth-context";
@@ -20,7 +20,7 @@ const iconChoices = ["pokeball", "🙂", "🚀", "📚", "🛠️", "🎮", "�
 type Draft = { title: string; priority: NewWorkItemInput["priority"] };
 
 type Breakdown =
-  | { ok: true; project: { name: string; identifier: string; description: string; live_url: string; github_url: string; icon: string; functions: string[]; frontend_stack: string; backend_stack: string }; workItems: Draft[] }
+  | { ok: true; project: { name: string; identifier: string; description: string; live_url: string; github_url: string; icon: string; functions: string[]; frontend_stack: string; backend_stack: string; is_public?: boolean }; workItems: Draft[] }
   | { ok: false; error: string };
 
 const isHttpUrl = (value: string) => {
@@ -54,6 +54,10 @@ function CreateForm({ onClose }: { onClose: () => void }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [autofilled, setAutofilled] = useState(false);
+  // An optional GitHub token for private repos: kept in this form only, sent in the request body, never stored.
+  const [ghToken, setGhToken] = useState("");
+  const [tokenOpen, setTokenOpen] = useState(false);
+  const [autoPrivate, setAutoPrivate] = useState(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [stack, setStack] = useState({ functions: [] as string[], frontend_stack: "", backend_stack: "" });
   const latest = useRef(0); // ignores a slow response once a newer analysis has started
@@ -68,7 +72,11 @@ function CreateForm({ onClose }: { onClose: () => void }) {
     setAnalyzing(true);
     setImportError(null);
     try {
-      const res = await fetch(`/api/github-breakdown?url=${encodeURIComponent(trimmed)}`);
+      const res = await fetch("/api/github-breakdown", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: trimmed, token: ghToken.trim() || undefined }),
+      });
       const data: Breakdown = await res.json();
       if (run !== latest.current) return;
       if (!data.ok) {
@@ -85,6 +93,11 @@ function CreateForm({ onClose }: { onClose: () => void }) {
       setIcon(p.icon);
       setDrafts(data.workItems);
       setStack({ functions: p.functions, frontend_stack: p.frontend_stack, backend_stack: p.backend_stack });
+      // A private repository makes the project Private automatically (the switch below can still be changed).
+      if (typeof p.is_public === "boolean") {
+        setIsPublic(p.is_public);
+        setAutoPrivate(!p.is_public);
+      }
       setAutofilled(true);
       setError(null);
     } catch {
@@ -186,6 +199,41 @@ function CreateForm({ onClose }: { onClose: () => void }) {
             {analyzing ? "Analyzing…" : "Analyze & Autofill"}
           </button>
         </div>
+        {/* Opens by itself when GitHub says the repo is private or not found. */}
+        {(() => {
+          const open = tokenOpen || (importError !== null && /private|token|not found/i.test(importError));
+          return (
+            <div className="mt-2">
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls="cp-token-field"
+                onClick={() => setTokenOpen(!open)}
+                className="flex items-center gap-1 text-xs font-medium text-red-700 hover:underline"
+              >
+                <KeyRound className="h-3.5 w-3.5" aria-hidden /> Private repo? Add a GitHub token
+              </button>
+              {open && (
+                <div id="cp-token-field" className="mt-1.5">
+                  <label htmlFor="cp-token" className="mb-1 block text-xs font-medium text-neutral-600">
+                    GitHub Token <span className="font-normal text-neutral-400">(used once, never saved)</span>
+                  </label>
+                  <input
+                    id="cp-token"
+                    type="password"
+                    value={ghToken}
+                    onChange={(e) => setGhToken(e.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                    placeholder="ghp_… or github_pat_…"
+                    className={`${fieldClass} font-mono`}
+                  />
+                  <p className="mt-1 text-[11px] text-neutral-500">Needs read access to the repository (contents and metadata).</p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {importError && (
           <p role="alert" className="mt-2 text-xs text-red-700">
             {importError}
@@ -194,6 +242,11 @@ function CreateForm({ onClose }: { onClose: () => void }) {
         {autofilled && !importError && (
           <div className="mt-2 flex flex-wrap gap-2 text-xs" role="status">
             <span className="rounded-full border border-red-200 bg-white px-2 py-0.5 font-medium text-red-700">Autofilled from GitHub</span>
+            {autoPrivate && !isPublic && (
+              <span className="flex items-center gap-1 rounded-full border border-neutral-300 bg-neutral-100 px-2 py-0.5 font-medium text-neutral-700">
+                <Lock className="h-3 w-3" aria-hidden /> Auto-detected: Private repository
+              </span>
+            )}
             {(stack.frontend_stack || stack.backend_stack) && (
               <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 font-medium text-neutral-700">✓ Detected tech stack</span>
             )}

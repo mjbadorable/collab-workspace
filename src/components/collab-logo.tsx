@@ -1,6 +1,6 @@
 import { useId } from "react";
 
-// Brand mark: a burgundy hexagon, a bold white "C" and an amber accent in the lower-right corner.
+// Brand mark: an interlocking hexagon: burgundy frame, white C-ribbon and an amber ribbon on the lower-right edge.
 // `full` adds the wordmark. `onDark` is for the burgundy sidebar / dark panels (white wordmark text).
 export default function CollabLogo({
   variant = "mark",
@@ -17,14 +17,17 @@ export default function CollabLogo({
     <svg viewBox="0 0 48 48" className={`shrink-0 ${className}`} aria-hidden={variant === "full" ? true : undefined} role={variant === "full" ? undefined : "img"} aria-label={variant === "full" ? undefined : "Collab Workspace"}>
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor="#6E1220" />
-          <stop offset="1" stopColor="#5C0F1B" />
+          <stop offset="0" stopColor="#7F1D1D" />
+          <stop offset="1" stopColor="#430A13" />
         </linearGradient>
       </defs>
-      {/* The faint light edge keeps the burgundy mark visible on the burgundy sidebar. */}
-      <polygon points="24,2 43,13 43,35 24,46 5,35 5,13" fill={`url(#${gradientId})`} stroke="#ffffff" strokeOpacity="0.3" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M31 17 A10 10 0 1 0 31 31" fill="none" stroke="#ffffff" strokeWidth="5" strokeLinecap="round" />
-      <polygon points="30,38 38,33.5 38,36.5 30,41" fill="#F59E0B" />
+      {/* Outer frame. The faint light edge keeps it visible on dark surfaces. */}
+      <polygon points="24,2 43,13 43,35 24,46 5,35 5,13" fill={`url(#${gradientId})`} stroke="#ffffff" strokeOpacity="0.25" strokeWidth="1.2" strokeLinejoin="round" />
+      {/* White C-ribbon: top-right, over the top, down the left, curling into the centre. */}
+      <path d="M26 24 Q33.5 23 35.7 17.25 L24 10.5 L12.3 17.25 L12.3 30.75 L24 37.5" fill="none" stroke="#ffffff" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
+      {/* Amber ribbon completing the lower-right edge; the dark halo underneath makes it read as interlocking with the C. */}
+      <path d="M24 37.5 L35.7 30.75 L35.7 21.5" fill="none" stroke="#5C0F1B" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M24 37.5 L35.7 30.75 L35.7 21.5" fill="none" stroke="#F59E0B" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
   if (variant === "mark") return mark;

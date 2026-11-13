@@ -3,16 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Keyboard, LogIn, LogOut, Menu, Pencil, Search } from "lucide-react";
+import { ChevronDown, Keyboard, LogIn, LogOut, Menu, Moon, Pencil, Search, Settings, Sun } from "lucide-react";
 import ActivityBell from "@/components/activity-bell";
 import Avatar from "@/components/settings/avatar";
 import { useAuth } from "@/lib/auth-context";
-import { roleTone, useProfile } from "@/lib/profile-context";
+import { useProfile } from "@/lib/profile-context";
+import { useTheme } from "@/lib/theme";
 import { useIsClient } from "@/lib/use-is-client";
 
-function ProfileChip({ onEditProfile }: { onEditProfile: () => void }) {
+function ProfileChip({ onEditProfile, onShortcuts }: { onEditProfile: () => void; onShortcuts: () => void }) {
   const { profile, displayName } = useProfile();
   const { user, loading, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
   const mounted = useIsClient();
   const [open, setOpen] = useState(false);
@@ -35,9 +37,14 @@ function ProfileChip({ onEditProfile }: { onEditProfile: () => void }) {
   }, [open]);
 
   // Profile data comes from localStorage / the session, so nothing renders until the client has it.
-  if (!mounted || loading) return <div className="h-9 w-9 sm:w-44" aria-hidden />;
+  if (!mounted || loading) return <div className="h-9 w-9 sm:w-52" aria-hidden />;
 
-  const item = "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-100";
+  const item =
+    "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400";
+  const rolePill = "rounded-full bg-[#7F1D1D] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white";
+  const email = user?.email ?? "Local preview";
+  const ThemeIcon = theme === "dark" ? Sun : Moon;
+  const close = () => setOpen(false);
 
   return (
     <div ref={ref} className="relative">
@@ -46,46 +53,70 @@ function ProfileChip({ onEditProfile }: { onEditProfile: () => void }) {
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-lg p-1 pr-2 hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+        className="flex items-center gap-2.5 rounded-full border border-neutral-200 bg-white py-1 pl-1.5 pr-3 shadow-xs hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
       >
         <Avatar url={profile.avatar_url} name={displayName} />
         <span className="hidden min-w-0 text-left leading-tight sm:block">
-          <span className="block max-w-36 truncate text-sm font-semibold" title={user?.email ?? displayName}>
-            {displayName}
-          </span>
-          <span className={`mt-0.5 inline-block whitespace-nowrap rounded px-1 text-[10px] font-semibold uppercase ${roleTone(profile.role)}`}>{profile.role}</span>
+          <span className="block max-w-36 truncate text-sm font-semibold">{displayName}</span>
+          <span className="block max-w-36 truncate text-[11px] text-neutral-500">{email}</span>
         </span>
-        <ChevronDown className="hidden h-4 w-4 text-neutral-400 sm:block" aria-hidden />
+        <span className={`hidden whitespace-nowrap sm:inline ${rolePill}`}>{profile.role}</span>
+        <ChevronDown className="h-4 w-4 text-neutral-400" aria-hidden />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-full z-30 mt-1 w-52 rounded-lg border border-neutral-200 bg-white p-1 shadow-xl">
-          <p className="truncate px-2 py-1.5 text-xs text-neutral-500">{user ? (user.email ?? "Signed in") : "Local preview"}</p>
+        <div role="menu" className="absolute right-0 top-full z-30 mt-2 w-72 rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl">
+          <div className="px-2.5 py-2">
+            <p className="truncate text-sm font-bold text-neutral-900">{displayName}</p>
+            <p className="truncate text-xs text-neutral-500">{email}</p>
+            <span className={`mt-2 inline-block ${rolePill}`}>{profile.role}</span>
+          </div>
+          <div className="my-1 border-t border-neutral-100" role="separator" />
+          <Link href="/settings" role="menuitem" onClick={close} className={item}>
+            <Settings className="h-4 w-4 text-neutral-500" aria-hidden /> Settings
+          </Link>
           <button
             type="button"
             role="menuitem"
             onClick={() => {
-              setOpen(false);
+              close();
+              onShortcuts();
+            }}
+            className={item}
+          >
+            <Keyboard className="h-4 w-4 text-neutral-500" aria-hidden /> Keyboard shortcuts
+          </button>
+          <button type="button" role="menuitem" onClick={toggleTheme} className={item}>
+            <ThemeIcon className="h-4 w-4 text-neutral-500" aria-hidden />
+            <span className="flex-1">Theme: {theme === "dark" ? "Dark" : "Light"}</span>
+            <span className="text-xs text-neutral-400">switch to {theme === "dark" ? "Light" : "Dark"}</span>
+          </button>
+          <div className="my-1 border-t border-neutral-100" role="separator" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              close();
               onEditProfile();
             }}
             className={item}
           >
-            <Pencil className="h-4 w-4" aria-hidden /> Edit profile
+            <Pencil className="h-4 w-4 text-neutral-500" aria-hidden /> Edit profile
           </button>
           {user ? (
             <button
               type="button"
               role="menuitem"
               onClick={async () => {
-                setOpen(false);
+                close();
                 await signOut();
                 router.push("/login");
               }}
               className={item}
             >
-              <LogOut className="h-4 w-4" aria-hidden /> Sign out
+              <LogOut className="h-4 w-4 text-neutral-500" aria-hidden /> Sign out
             </button>
           ) : (
-            <Link href="/login" role="menuitem" onClick={() => setOpen(false)} className={`${item} text-red-600`}>
+            <Link href="/login" role="menuitem" onClick={close} className={`${item} text-red-600`}>
               <LogIn className="h-4 w-4" aria-hidden /> Sign in
             </Link>
           )}
@@ -133,7 +164,7 @@ export default function TopBar({
         >
           <Keyboard className="h-4 w-4" aria-hidden />
         </button>
-        <ProfileChip onEditProfile={onEditProfile} />
+        <ProfileChip onEditProfile={onEditProfile} onShortcuts={onShortcuts} />
       </div>
     </header>
   );

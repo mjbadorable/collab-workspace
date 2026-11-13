@@ -20,12 +20,10 @@ import {
   Laptop,
   Layers,
   ListTodo,
-  Moon,
   Network,
   Plus,
   RefreshCw,
   Settings,
-  Sun,
   Trash2,
   User,
   UserPlus,
@@ -40,7 +38,6 @@ import ProjectAvatar from "@/components/project-avatar";
 import { useActivityLog } from "@/lib/activity-log";
 import { mockWorkspace } from "@/lib/mock-data";
 import { useProjects } from "@/lib/projects-context";
-import { useTheme } from "@/lib/theme";
 import { useWorkspacePermissions } from "@/lib/use-permissions";
 
 const workspaceNav: { label: string; href: string; icon: LucideIcon }[] = [
@@ -98,7 +95,6 @@ export default function Sidebar({
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const { user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const { workspaces, current, select } = useWorkspaces();
   const { unread } = useActivityLog();
   // The server also rejects non-admin invites; hiding the menu item just avoids a dead end.
@@ -119,7 +115,7 @@ export default function Sidebar({
   };
 
   return (
-    <div className="flex h-full w-64 flex-col bg-[#0c0d10] bg-linear-to-b from-[#121317] to-[#090a0c] border-r border-white/10 text-neutral-100">
+    <div className="app-sidebar flex h-full w-64 flex-col bg-[#0c0d10] bg-linear-to-b from-[#121317] to-[#090a0c] border-r border-white/10 text-neutral-100">
       <div className="space-y-3 p-3">
         <Link href="/" onClick={onNavigate} aria-label="Collab Workspace home" className="block rounded-md px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400">
           <CollabLogo variant="full" onDark className="h-9 w-9" />
@@ -359,21 +355,6 @@ export default function Sidebar({
           <span className="flex-1 text-left">Device handoff</span>
           <span aria-hidden>📡</span>
         </button>
-        <div className="flex items-center gap-1">
-          <Link href="/settings" onClick={onNavigate} aria-current={pathname === "/settings" ? "page" : undefined} className={`${itemClass(pathname === "/settings")} flex-1`}>
-            <Settings className={iconClass(pathname === "/settings")} aria-hidden />
-            Settings
-          </Link>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            title="Switch between Poké-Center Light and Silph Co. Dark"
-            aria-label="Switch between Poké-Center Light and Silph Co. Dark"
-            className="rounded-md p-2 text-white/75 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-        </div>
       </div>
     </div>
   );

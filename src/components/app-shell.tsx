@@ -25,7 +25,7 @@ import WorkspaceDialog from "./workspace-dialog";
 import { NewWorkItemProvider } from "./work-items/new-work-item-context";
 
 // usePathname() is request-time data on dynamic routes, so the sidebar streams in under Suspense.
-const SidebarFallback = () => <div className="h-full w-64 border-r border-white/10 bg-[#0c0d10]" />;
+const SidebarFallback = () => <div className="app-sidebar h-full w-64 border-r border-white/10 bg-[#0c0d10]" />;
 
 export default function AppShell({ children }: { children: ReactNode }) {
   return (

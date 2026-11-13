@@ -1,3 +1,5 @@
+import { isLocalhost } from "@/lib/fleet-paths";
+
 const TIMEOUT_MS = 8000;
 const COMMIT_COUNT = 5;
 
@@ -48,9 +50,21 @@ function parseRepo(input: string): { owner: string; repo: string } | null {
   return { owner, repo };
 }
 
-const github = (path: string) =>
+// The server's GITHUB_TOKEN can read every repo its owner can, so on a public deployment it is only used when the
+// deployment opts in (GITHUB_TOKEN_ALLOW_REMOTE=true); requests from this machine can always use it.
+function serverToken(request: Request): string {
+  const token = process.env.GITHUB_TOKEN?.trim() ?? "";
+  if (!/^[A-Za-z0-9_-]{20,255}$/.test(token)) return "";
+  return isLocalhost(request.headers.get("host")) || process.env.GITHUB_TOKEN_ALLOW_REMOTE === "true" ? token : "";
+}
+
+const github = (path: string, token: string) =>
   fetch(`${API_HOST}${path}`, {
-    headers: { "User-Agent": "collab-workspace", Accept: "application/vnd.github+json" },
+    headers: {
+      "User-Agent": "collab-workspace",
+      Accept: "application/vnd.github+json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     cache: "no-store",
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });
@@ -66,13 +80,14 @@ export async function GET(request: Request) {
   const parsed = parseRepo(new URL(request.url).searchParams.get("url") ?? "");
   if (!parsed) return fail("Not a valid GitHub repository URL.", 400);
   const { owner, repo } = parsed;
+  const token = serverToken(request);
 
   try {
     const [repoRes, commitsRes, pullsRes] = await Promise.all([
-      github(`/repos/${owner}/${repo}`),
-      github(`/repos/${owner}/${repo}/commits?per_page=${COMMIT_COUNT}`),
+      github(`/repos/${owner}/${repo}`, token),
+      github(`/repos/${owner}/${repo}/commits?per_page=${COMMIT_COUNT}`, token),
       // Pull requests are a bonus: if they fail, the rest of the widget still works.
-      github(`/repos/${owner}/${repo}/pulls?state=all&per_page=${COMMIT_COUNT}`).catch(() => null),
+      github(`/repos/${owner}/${repo}/pulls?state=all&per_page=${COMMIT_COUNT}`, token).catch(() => null),
     ]);
     if (!repoRes.ok) return fail(statusError(repoRes.status));
     if (!commitsRes.ok) return fail(statusError(commitsRes.status));
@@ -115,8 +130,9 @@ export async function GET(request: Request) {
       })),
     }, {
       headers: {
-        // Edge-cached for 2 minutes, then served stale while it refreshes in the background.
-        "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
+        // Public data is edge-cached for 2 minutes, then served stale while it refreshes. Anything fetched with a
+        // token may be a private repo, so it is never shared-cached.
+        "Cache-Control": token ? "private, no-store" : "public, s-maxage=120, stale-while-revalidate=600",
       },
     });
   } catch {

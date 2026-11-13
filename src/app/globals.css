@@ -95,38 +95,38 @@ body {
 @media screen {
   html.dark {
     color-scheme: dark;
-    --background: #0b0f19;
-    --foreground: #f3f4f6;
+    --background: #090a0c;
+    --foreground: #f4f4f5;
   }
-  html.dark .bg-white { background-color: #111827; }
-  html.dark .bg-neutral-50 { background-color: #0f1524; }
-  html.dark .bg-neutral-100 { background-color: #1f2937; }
-  html.dark .bg-neutral-200 { background-color: #374151; }
+  html.dark .bg-white { background-color: #111215; }
+  html.dark .bg-neutral-50 { background-color: #0d0e11; }
+  html.dark .bg-neutral-100 { background-color: #181a1f; }
+  html.dark .bg-neutral-200 { background-color: #272930; }
   html.dark .text-neutral-900,
-  html.dark .text-neutral-800 { color: #f3f4f6; }
-  html.dark .text-neutral-700 { color: #e5e7eb; }
-  html.dark .text-neutral-600 { color: #d1d5db; }
-  html.dark .text-neutral-500 { color: #9ca3af; }
-  html.dark .text-neutral-400 { color: #8b95a5; }
-  html.dark .border-neutral-100 { border-color: #1f2937; }
-  html.dark .border-neutral-200 { border-color: #2a3547; } /* a touch lighter, so sticky headers and cards keep a visible edge */
-  html.dark .border-neutral-300 { border-color: #374151; }
+  html.dark .text-neutral-800 { color: #f4f4f5; }
+  html.dark .text-neutral-700 { color: #e4e4e7; }
+  html.dark .text-neutral-600 { color: #d4d4d8; }
+  html.dark .text-neutral-500 { color: #a1a1aa; }
+  html.dark .text-neutral-400 { color: #71717a; }
+  html.dark .border-neutral-100 { border-color: #1b1d22; }
+  html.dark .border-neutral-200 { border-color: #24262d; } /* a touch lighter, so sticky headers and cards keep a visible edge */
+  html.dark .border-neutral-300 { border-color: #32353e; }
   html.dark .divide-neutral-100 > :not(:last-child),
-  html.dark .divide-neutral-200 > :not(:last-child) { border-color: #1f2937; }
-  html.dark .ring-neutral-200 { --tw-ring-color: #374151; }
-  html.dark .fill-neutral-900 { fill: #f3f4f6; }
-  html.dark .fill-neutral-500 { fill: #9ca3af; }
-  html.dark .stroke-neutral-200 { stroke: #374151; }
-  html.dark .stroke-neutral-400 { stroke: #9ca3af; }
-  html.dark .stroke-white { stroke: #111827; }
-  html.dark .stroke-neutral-100 { stroke: #1f2937; }
-  html.dark .stroke-neutral-300 { stroke: #4b5563; }
+  html.dark .divide-neutral-200 > :not(:last-child) { border-color: #24262d; }
+  html.dark .ring-neutral-200 { --tw-ring-color: #32353e; }
+  html.dark .fill-neutral-900 { fill: #f4f4f5; }
+  html.dark .fill-neutral-500 { fill: #a1a1aa; }
+  html.dark .stroke-neutral-200 { stroke: #32353e; }
+  html.dark .stroke-neutral-400 { stroke: #a1a1aa; }
+  html.dark .stroke-white { stroke: #111215; }
+  html.dark .stroke-neutral-100 { stroke: #1b1d22; }
+  html.dark .stroke-neutral-300 { stroke: #3f3f46; }
 
-  html.dark .hover\:bg-neutral-50:hover { background-color: #162033; }
+  html.dark .hover\:bg-neutral-50:hover { background-color: #15171c; }
   html.dark .hover\:bg-neutral-100:hover,
-  html.dark .hover\:bg-neutral-200:hover { background-color: #1f2937; }
+  html.dark .hover\:bg-neutral-200:hover { background-color: #20232a; }
   html.dark .hover\:text-neutral-900:hover,
-  html.dark .hover\:text-neutral-700:hover { color: #f3f4f6; }
+  html.dark .hover\:text-neutral-700:hover { color: #f4f4f5; }
 
   /* Soft accent fills become translucent tints, and their dark text lightens. */
   html.dark .bg-red-50 { background-color: rgb(220 38 38 / 0.14); }
@@ -146,8 +146,8 @@ body {
   /* Dark-mode audit: pills, rings, links and the Source Code inspector's diff colours. */
   html.dark .bg-rose-50 { background-color: rgb(244 63 94 / 0.14); }
   html.dark .bg-rose-100 { background-color: rgb(244 63 94 / 0.25); }
-  html.dark .bg-slate-200 { background-color: #374151; }
-  html.dark .text-slate-700 { color: #e5e7eb; }
+  html.dark .bg-slate-200 { background-color: #272930; }
+  html.dark .text-slate-700 { color: #e4e4e7; }
   html.dark .text-rose-600,
   html.dark .text-rose-800,
   html.dark .text-rose-900 { color: #fda4af; }
@@ -164,18 +164,24 @@ body {
   html.dark .hover\:text-red-700:hover,
   html.dark .hover\:text-red-600:hover { color: #fca5a5; }
   html.dark .hover\:text-indigo-700:hover { color: #a5b4fc; }
-  html.dark .hover\:text-neutral-800:hover { color: #f3f4f6; }
+  html.dark .hover\:text-neutral-800:hover { color: #f4f4f5; }
   html.dark .hover\:border-red-200:hover,
   html.dark .hover\:border-red-300:hover { border-color: rgb(248 113 113 / 0.5); }
   html.dark .hover\:border-indigo-300:hover { border-color: rgb(129 140 248 / 0.5); }
 
   /* Command Center: the burgundy sidebar and Achievements card keep their brand colour in dark mode (they are
      not remapped by the neutral rules above), and the top bar / panels use the dark surface. */
-  html.dark kbd { background-color: #1f2937; border-color: #374151; color: #d1d5db; }
+  html.dark kbd { background-color: #181a1f; border-color: #32353e; color: #d4d4d8; }
   html.dark .shadow-xs,
   html.dark .shadow-sm { box-shadow: 0 1px 2px rgb(0 0 0 / 0.45); }
-  html.dark .hover\:bg-white:hover { background-color: #162033; }
-  html.dark .hover\:border-neutral-300:hover { border-color: #4b5563; }
+  /* Sidebar in dark mode: a touch lighter than the #090a0c canvas, so its edge reads clearly. This is class-based
+     (the theme toggle sets html.dark); Tailwind's dark: variant follows the OS setting instead. */
+  html.dark .app-sidebar {
+    background-color: #101114;
+    background-image: linear-gradient(to bottom, #121317, #0c0d10);
+  }
+  html.dark .hover\:bg-white:hover { background-color: #15171c; }
+  html.dark .hover\:border-neutral-300:hover { border-color: #3f3f46; }
   html.dark .bg-indigo-100 { background-color: rgb(99 102 241 / 0.28); }
   html.dark .text-red-700,
   html.dark .text-red-800 { color: #fca5a5; }
@@ -196,22 +202,22 @@ body {
   html.dark .hover\:bg-red-50:hover { background-color: rgb(220 38 38 / 0.2); }
 
   /* Gradient hero cards: the white stops follow the card colour. */
-  html.dark .from-white { --tw-gradient-from: #111827; }
-  html.dark .via-white { --tw-gradient-via: #111827; }
+  html.dark .from-white { --tw-gradient-from: #111215; }
+  html.dark .via-white { --tw-gradient-via: #111215; }
 
   html.dark input,
   html.dark select,
   html.dark textarea {
-    background-color: #0b0f19;
-    border-color: #374151;
-    color: #f3f4f6;
+    background-color: #090a0c;
+    border-color: #32353e;
+    color: #f4f4f5;
   }
   html.dark input::placeholder,
-  html.dark textarea::placeholder { color: #6b7280; }
+  html.dark textarea::placeholder { color: #71717a; }
   html.dark dialog {
-    background-color: #111827;
-    color: #f3f4f6;
-    border-color: #374151;
+    background-color: #111215;
+    color: #f4f4f5;
+    border-color: #32353e;
   }
   html.dark dialog::backdrop { background-color: rgb(0 0 0 / 0.6); }
 }

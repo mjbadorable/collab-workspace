@@ -8,6 +8,7 @@ import ProjectEnvBadge from "@/components/home/env-badge";
 import HealthPill from "@/components/home/health-pill";
 import LiveWorkItems from "@/components/home/live-work-items";
 import { progressOf } from "@/components/home/project-card";
+import PrivateBadge from "@/components/private-badge";
 import ProjectAvatar from "@/components/project-avatar";
 import DeploymentGateModal from "@/components/projects/deployment-gate-modal";
 import ExportReportDialog from "@/components/projects/export-report-dialog";
@@ -92,6 +93,7 @@ export default function ProjectHeader({ project }: { project: ProjectRecord }) {
             <h1 className="truncate text-lg font-semibold">{project.name}</h1>
             <span className="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-xs text-neutral-600">{project.identifier}</span>
             <ProjectEnvBadge project={project} />
+            <PrivateBadge project={project} />
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
             {project.live_url ? (
@@ -133,11 +135,11 @@ export default function ProjectHeader({ project }: { project: ProjectRecord }) {
         </div>
       </div>
 
-      <nav aria-label={`${project.name} sections`} className="mt-3 flex items-end gap-5 overflow-x-auto px-6">
+      <nav aria-label={`${project.name} sections`} className="mt-3 flex items-end gap-5 overflow-x-auto px-6 pb-2.5">
         {TAB_GROUPS.map((group) => (
           <div key={group.label} role="group" aria-label={group.label} className="shrink-0">
             <p className="px-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">{group.label}</p>
-            <ul className="flex">
+            <ul className="flex gap-1">
               {group.tabs.map((tab) => {
                 const active = isActive(tab.slug);
                 return (
@@ -145,8 +147,10 @@ export default function ProjectHeader({ project }: { project: ProjectRecord }) {
                     <Link
                       href={hrefOf(tab.slug)}
                       aria-current={active ? "page" : undefined}
-                      className={`-mb-px block whitespace-nowrap border-b-2 px-2 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 ${
-                        active ? "border-red-600 font-medium text-neutral-900" : "border-transparent text-neutral-500 hover:text-neutral-800"
+                      className={`block whitespace-nowrap rounded-full px-3 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400 ${
+                        active
+                          ? "bg-red-600 font-semibold text-white shadow-xs"
+                          : "font-medium text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
                       }`}
                     >
                       {tab.label}

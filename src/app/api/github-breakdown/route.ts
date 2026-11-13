@@ -1,3 +1,4 @@
+import { isLocalhost } from "@/lib/fleet-paths";
 import { suggestIdentifier } from "@/lib/identifier";
 
 const TIMEOUT_MS = 8000;
@@ -245,29 +246,66 @@ async function fetchWithTimeout(url: string, headers: HeadersInit) {
   return fetch(url, { headers, cache: "no-store", signal: AbortSignal.timeout(TIMEOUT_MS) });
 }
 
-async function fetchRaw(owner: string, repo: string, branch: string, file: string): Promise<string> {
+// Real GitHub tokens are letters, digits, "_" and "-". Anything else (spaces, newlines) is rejected, so a token can
+// never smuggle extra header lines.
+const TOKEN_PATTERN = /^[A-Za-z0-9_-]{20,255}$/;
+
+// The server's own GITHUB_TOKEN can read every repo its owner can. On a public deployment that would let any visitor
+// read private repos through this route, so it is only used for requests from this machine, unless explicitly allowed.
+function serverToken(request: Request): string {
+  const token = process.env.GITHUB_TOKEN?.trim() ?? "";
+  if (!TOKEN_PATTERN.test(token)) return "";
+  return isLocalhost(request.headers.get("host")) || process.env.GITHUB_TOKEN_ALLOW_REMOTE === "true" ? token : "";
+}
+
+// With a token the file comes from the contents API (works for private repos); without one, from raw.githubusercontent.com.
+async function fetchFile(owner: string, repo: string, branch: string, file: string, token: string): Promise<string> {
   try {
-    const res = await fetchWithTimeout(`${RAW_HOST}/${owner}/${repo}/${encodeURIComponent(branch)}/${file}`, {
-      "User-Agent": "collab-workspace",
-    });
+    const res = token
+      ? await fetchWithTimeout(`${API_HOST}/repos/${owner}/${repo}/contents/${file}?ref=${encodeURIComponent(branch)}`, {
+          "User-Agent": "collab-workspace",
+          Accept: "application/vnd.github.raw+json",
+          Authorization: `Bearer ${token}`,
+        })
+      : await fetchWithTimeout(`${RAW_HOST}/${owner}/${repo}/${encodeURIComponent(branch)}/${file}`, { "User-Agent": "collab-workspace" });
     return res.ok ? (await res.text()).slice(0, MAX_README_CHARS) : "";
   } catch {
     return ""; // a missing file is fine: the repo metadata alone still fills most of the form
   }
 }
 
-export async function GET(request: Request) {
-  const parsed = parseRepo(new URL(request.url).searchParams.get("url") ?? "");
+const PRIVATE_HINT = "Paste a GitHub Personal Access Token below (or set GITHUB_TOKEN on the server) to analyze private repositories.";
+
+async function analyze(rawUrl: string, requestToken: string, request: Request): Promise<Response> {
+  const parsed = parseRepo(rawUrl);
   if (!parsed) return fail("Enter a GitHub repository URL like https://github.com/owner/repo.", 400);
   const { owner, repo } = parsed;
 
-  let meta: { name: string; description: string | null; homepage: string | null; default_branch: string; language: string | null; topics?: string[] };
+  const given = requestToken.trim();
+  if (given && !TOKEN_PATTERN.test(given)) return fail("That does not look like a GitHub token.", 400);
+  const token = given || serverToken(request);
+
+  let meta: {
+    name: string;
+    description: string | null;
+    homepage: string | null;
+    default_branch: string;
+    language: string | null;
+    topics?: string[];
+    private?: boolean;
+  };
   try {
     const res = await fetchWithTimeout(`${API_HOST}/repos/${owner}/${repo}`, {
       "User-Agent": "collab-workspace",
       Accept: "application/vnd.github+json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     });
-    if (res.status === 404) return fail("Repository not found, or it is private.", 404);
+    if (res.status === 401) {
+      return fail(token ? "GitHub rejected that token. Check that it is valid and has not expired." : `Repository not found, or it is private. ${PRIVATE_HINT}`, 401);
+    }
+    if (res.status === 404) {
+      return fail(token ? "Repository not found, or that token cannot access it." : `Repository not found, or it is private. ${PRIVATE_HINT}`, 404);
+    }
     if (res.status === 403 || res.status === 429) {
       return fail("GitHub rate limit reached. Try again in a few minutes, or fill the form manually.", 429);
     }
@@ -278,8 +316,8 @@ export async function GET(request: Request) {
   }
 
   const [readme, packageJson] = await Promise.all([
-    fetchRaw(owner, repo, meta.default_branch, "README.md"),
-    fetchRaw(owner, repo, meta.default_branch, "package.json"),
+    fetchFile(owner, repo, meta.default_branch, "README.md", token),
+    fetchFile(owner, repo, meta.default_branch, "package.json", token),
   ]);
 
   const name = readmeName(readme) ?? prettify(meta.name);
@@ -299,12 +337,27 @@ export async function GET(request: Request) {
     functions: features.slice(0, MAX_FUNCTIONS),
     frontend_stack: frontend.join(", "),
     backend_stack: backend.join(", "),
+    is_public: !meta.private,
   };
 
-  return Response.json({ ok: true, project, workItems: extractWorkItems(todos, features) }, {
-    headers: {
-      // Edge-cached for 2 minutes, then served stale while it refreshes in the background.
-      "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",
-    },
-  });
+  // Anything fetched with a token, and any private repo's metadata, must never sit in a shared edge cache.
+  const cacheControl = token || meta.private ? "private, no-store" : "public, s-maxage=120, stale-while-revalidate=600";
+  return Response.json({ ok: true, project, workItems: extractWorkItems(todos, features) }, { headers: { "Cache-Control": cacheControl } });
+}
+
+// ?url=<repo>: public repos (and private ones when the server has its own GITHUB_TOKEN, on this machine).
+export async function GET(request: Request) {
+  return analyze(new URL(request.url).searchParams.get("url") ?? "", "", request);
+}
+
+// { url, token? }: the token travels in the body, never in a URL, and is used for this one request only.
+export async function POST(request: Request) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return fail("Invalid request.", 400);
+  }
+  const { url, token } = (typeof body === "object" && body !== null ? body : {}) as { url?: unknown; token?: unknown };
+  return analyze(typeof url === "string" ? url : "", typeof token === "string" ? token : "", request);
 }
