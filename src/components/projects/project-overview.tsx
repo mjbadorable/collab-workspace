@@ -1,18 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Circle, Diamond, ExternalLink, FileDown, GitFork, Rocket, Square, type LucideIcon } from "lucide-react";
-import HealthPill from "@/components/home/health-pill";
+import { ArrowRight, Check, Circle, Diamond, Square, type LucideIcon } from "lucide-react";
 import LiveWorkItems from "@/components/home/live-work-items";
 import LocalDevWidget from "@/components/home/local-dev-widget";
 import { progressOf } from "@/components/home/project-card";
 import { useEnvironment } from "@/components/environment-switcher";
 import ProjectAvatar from "@/components/project-avatar";
 import SmokeTestRunner from "@/components/projects/smoke-test-runner";
-import { GitActionMenu } from "@/components/projects/git-action-controls";
-import DeploymentGateModal from "@/components/projects/deployment-gate-modal";
-import ExportReportDialog from "@/components/projects/export-report-dialog";
 import GithubActivity from "@/components/projects/github-activity";
 import ProjectAnalytics from "@/components/projects/project-analytics";
 import ReleasesPanel from "@/components/projects/releases-panel";
@@ -124,8 +119,6 @@ function FlowchartPipeline({ projectId }: { projectId: string }) {
 export default function ProjectOverview({ projectId }: { projectId: string }) {
   const mounted = useIsClient();
   const { projects } = useProjects();
-  const [exporting, setExporting] = useState(false);
-  const [gateOpen, setGateOpen] = useState(false);
   const [environment] = useEnvironment();
   // The slug fallback keeps an old bookmark (e.g. /projects/collab-workspace-devops-portal) from 404ing.
   const project = projects.find((p) => p.id === projectId) ?? projects.find((p) => slugify(p.name) === projectId);
@@ -135,63 +128,9 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
 
   const base = `/projects/${project.id}`;
   const diagrams = getProjectDiagrams(project.id);
-  const linkClass =
-    "flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-sm font-medium text-neutral-700 shadow-xs transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700";
 
   return (
     <div className="mx-auto max-w-5xl space-y-8 px-6 py-8">
-      <header className="flex flex-wrap items-start gap-4 rounded-xl border border-neutral-200 bg-linear-to-br from-white via-white to-red-50/40 p-6 shadow-xs">
-        <ProjectAvatar project={project} className="h-14 w-14 text-2xl" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-semibold">{project.name}</h1>
-            <span className="rounded border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 font-mono text-xs text-neutral-600">
-              {project.identifier}
-            </span>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-            <span className="rounded-full border border-neutral-200 bg-white px-2 py-0.5 font-medium text-neutral-600">
-              {project.is_public ? "Public" : "Private"}
-            </span>
-            {project.lead && (
-              <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 font-medium text-red-700">
-                Lead: {project.lead}
-              </span>
-            )}
-            {project.live_url ? (
-              <HealthPill url={project.live_url} />
-            ) : (
-              <span className="text-neutral-500">
-                No live URL yet. Add one in{" "}
-                <Link href={`${base}/settings`} className="text-red-600 hover:underline">
-                  settings
-                </Link>{" "}
-                to monitor production.
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {project.github_url && (
-            <a href={project.github_url} target="_blank" rel="noopener noreferrer" className={linkClass}>
-              <GitFork className="h-3.5 w-3.5" aria-hidden /> GitHub
-            </a>
-          )}
-          {project.live_url && (
-            <a href={project.live_url} target="_blank" rel="noopener noreferrer" className={linkClass}>
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden /> Live App
-            </a>
-          )}
-          <button type="button" onClick={() => setGateOpen(true)} className={linkClass}>
-            <Rocket className="h-3.5 w-3.5" aria-hidden /> Inspect Deployment Gate
-          </button>
-          <GitActionMenu projectId={project.id} className={linkClass} />
-          <button type="button" onClick={() => setExporting(true)} className={linkClass}>
-            <FileDown className="h-3.5 w-3.5" aria-hidden /> Export Report
-          </button>
-        </div>
-      </header>
-
       <section aria-labelledby="ov-about" className="grid gap-6 md:grid-cols-2">
         <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-xs">
           <h2 id="ov-about" className="text-sm font-semibold text-neutral-700">
@@ -319,8 +258,6 @@ export default function ProjectOverview({ projectId }: { projectId: string }) {
 
       {project.id === "collab-workspace" && <SuggestedImprovements projectId={project.id} />}
 
-      <DeploymentGateModal projectId={project.id} open={gateOpen} onClose={() => setGateOpen(false)} />
-      <ExportReportDialog project={project} open={exporting} onClose={() => setExporting(false)} />
     </div>
   );
 }

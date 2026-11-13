@@ -32,7 +32,9 @@ function StatusDonut({ items }: { items: StoredWorkItem[] }) {
 
   return (
     <div className="flex flex-wrap items-center gap-6">
-      <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0 -rotate-90" role="img" aria-label={`${percent}% of work items are done`}>
+      <svg viewBox="0 0 120 120" className="h-32 w-32 shrink-0" role="img" aria-label={`${percent}% of work items are done`}>
+        {/* The ring is rotated inside the SVG (not with a CSS transform on it), so the browser keeps the SVG on the normal paint path while scrolling. */}
+        <g transform="rotate(-90 60 60)">
         <circle cx="60" cy="60" r={RADIUS} fill="none" strokeWidth="14" className="stroke-neutral-100" />
         {total > 0 &&
           counts
@@ -55,8 +57,8 @@ function StatusDonut({ items }: { items: StoredWorkItem[] }) {
               offset += length;
               return circle;
             })}
-        {/* Counter-rotated so the label reads upright inside the rotated ring. */}
-        <text x="60" y="60" textAnchor="middle" dominantBaseline="central" transform="rotate(90 60 60)" className="fill-neutral-900 text-[22px] font-semibold">
+        </g>
+        <text x="60" y="60" textAnchor="middle" dominantBaseline="central" className="fill-neutral-900 text-[22px] font-semibold">
           {percent}%
         </text>
       </svg>
@@ -270,7 +272,7 @@ function HygieneScorecard({ projectId, items }: { projectId: string; items: Stor
 function Charts({ projectId, items, detailed }: { projectId: string; items: StoredWorkItem[]; detailed: boolean }) {
   return (
     <>
-    <div className="mt-3 grid gap-4 md:grid-cols-3">
+    <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <div className={card}>
         <h3 className="mb-4 text-sm font-semibold">Status breakdown</h3>
         <StatusDonut items={items} />

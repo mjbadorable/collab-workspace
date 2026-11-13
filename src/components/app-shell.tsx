@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { Menu, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { AuthProvider } from "@/lib/auth-context";
 import { ProfileProvider } from "@/lib/profile-context";
 import { ProjectsProvider } from "@/lib/projects-context";
@@ -20,11 +20,12 @@ import TeamRoomDock from "./projects/team-room-dock";
 import EditProfileDialog from "./settings/edit-profile-dialog";
 import InviteDialog from "./settings/invite-dialog";
 import Sidebar from "./sidebar";
+import TopBar from "./top-bar";
 import WorkspaceDialog from "./workspace-dialog";
 import { NewWorkItemProvider } from "./work-items/new-work-item-context";
 
 // usePathname() is request-time data on dynamic routes, so the sidebar streams in under Suspense.
-const SidebarFallback = () => <div className="h-full w-64 border-r border-neutral-200 bg-neutral-50" />;
+const SidebarFallback = () => <div className="h-full w-64 border-r border-white/10 bg-[#0c0d10]" />;
 
 export default function AppShell({ children }: { children: ReactNode }) {
   return (
@@ -96,7 +97,7 @@ function Chrome({ children }: { children: ReactNode }) {
 
   return (
     <NewWorkItemProvider>
-    <div className="flex h-full w-full overflow-hidden">
+    <div className="flex min-h-dvh w-full">
       {/* Desktop: fixed sidebar */}
       {sidebarCollapsed ? (
         <button
@@ -104,19 +105,16 @@ function Chrome({ children }: { children: ReactNode }) {
           onClick={() => setSidebarCollapsed(false)}
           title="Open sidebar ([)"
           aria-label="Open sidebar"
-          className="fixed left-0 top-20 z-20 hidden rounded-r-full border border-l-0 border-neutral-200 bg-white py-1.5 pl-1 pr-1.5 text-neutral-500 shadow-md hover:text-neutral-900 md:block"
+          className="fixed left-0 top-20 z-40 hidden rounded-r-full border border-l-0 border-neutral-300 bg-white py-1.5 pl-1 pr-1.5 text-neutral-500 shadow-md hover:text-neutral-900 md:block"
         >
           <PanelLeftOpen className="h-4 w-4" />
         </button>
       ) : (
-        <aside className="relative hidden h-full md:block">
+        <aside className="sticky top-0 z-40 hidden h-dvh shrink-0 md:block">
           <Suspense fallback={<SidebarFallback />}>
             <Sidebar
               onNewWorkspace={() => setWorkspaceRequested(true)}
               onInvite={() => setInviteRequested(true)}
-              onEditProfile={() => setProfileRequested(true)}
-              onSearch={() => setPaletteOpen(true)}
-              onShortcuts={() => setShortcutsOpen(true)}
               onDeviceHandoff={() => setHandoffOpen(true)}
             />
           </Suspense>
@@ -147,18 +145,6 @@ function Chrome({ children }: { children: ReactNode }) {
                   setMobileOpen(false);
                   setInviteRequested(true);
                 }}
-                onEditProfile={() => {
-                  setMobileOpen(false);
-                  setProfileRequested(true);
-                }}
-                onSearch={() => {
-                  setMobileOpen(false);
-                  setPaletteOpen(true);
-                }}
-                onShortcuts={() => {
-                  setMobileOpen(false);
-                  setShortcutsOpen(true);
-                }}
                 onDeviceHandoff={() => {
                   setMobileOpen(false);
                   setHandoffOpen(true);
@@ -169,7 +155,7 @@ function Chrome({ children }: { children: ReactNode }) {
               type="button"
               aria-label="Close menu"
               onClick={() => setMobileOpen(false)}
-              className="absolute right-2 top-3 rounded p-1 text-neutral-500 hover:bg-neutral-200"
+              className="absolute right-2 top-3 rounded p-1 text-white/70 hover:bg-white/10 hover:text-white"
             >
               <X className="h-4 w-4" />
             </button>
@@ -178,18 +164,14 @@ function Chrome({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <div className="flex h-full min-w-0 flex-1 flex-col">
-        <header className="flex items-center border-b border-neutral-200 px-4 py-2 md:hidden">
-          <button
-            type="button"
-            aria-label="Open menu"
-            onClick={() => setMobileOpen(true)}
-            className="rounded p-1 text-neutral-600 hover:bg-neutral-100"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-        </header>
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar
+          onMenu={() => setMobileOpen(true)}
+          onSearch={() => setPaletteOpen(true)}
+          onShortcuts={() => setShortcutsOpen(true)}
+          onEditProfile={() => setProfileRequested(true)}
+        />
+        <main className="flex-1">{children}</main>
       </div>
     </div>
     <WorkspaceDialog requested={workspaceRequested} onClose={() => setWorkspaceRequested(false)} />

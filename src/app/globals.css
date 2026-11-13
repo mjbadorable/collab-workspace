@@ -1,21 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #f7f8fa; /* canvas; cards sit on it as white surfaces */
   --foreground: #171717;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-inter);
+  /* Brand + status tokens */
+  --color-brand-900: #430a13;
+  --color-brand-800: #5c0f1b;
+  --color-brand-700: #6e1220;
+  --color-gold: #f59e0b;
+  --color-canvas: #f7f8fa;
+  --color-line: #e4e4e7;
+  --color-primary: #e50914;
+  --color-primary-strong: #991b1b;
+  --color-success: #16a36a;
+  --color-warning: #e8a23a;
   --font-mono: var(--font-geist-mono);
-}
-
-html,
-body {
-  height: 100%;
-  overflow: hidden;
 }
 
 /* Printing the export dialog: only the report (.print-area) is shown, as a plain white document. */
@@ -60,6 +65,26 @@ body {
   }
 }
 
+/* Task detail drawer: a native <dialog> pinned to the right edge that slides in. */
+@keyframes drawer-in {
+  from {
+    transform: translateX(2rem);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+dialog.drawer-panel[open] {
+  animation: drawer-in 0.18s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.drawer-panel[open] {
+    animation: none;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -83,8 +108,8 @@ body {
   html.dark .text-neutral-600 { color: #d1d5db; }
   html.dark .text-neutral-500 { color: #9ca3af; }
   html.dark .text-neutral-400 { color: #8b95a5; }
-  html.dark .border-neutral-200,
   html.dark .border-neutral-100 { border-color: #1f2937; }
+  html.dark .border-neutral-200 { border-color: #2a3547; } /* a touch lighter, so sticky headers and cards keep a visible edge */
   html.dark .border-neutral-300 { border-color: #374151; }
   html.dark .divide-neutral-100 > :not(:last-child),
   html.dark .divide-neutral-200 > :not(:last-child) { border-color: #1f2937; }
@@ -112,6 +137,45 @@ body {
   html.dark .bg-blue-50 { background-color: rgb(99 102 241 / 0.16); }
   html.dark .bg-purple-50 { background-color: rgb(168 85 247 / 0.16); }
   html.dark .bg-red-100 { background-color: rgb(220 38 38 / 0.25); }
+  html.dark .bg-amber-100 { background-color: rgb(245 158 11 / 0.25); }
+  html.dark .bg-emerald-100 { background-color: rgb(16 185 129 / 0.25); }
+  html.dark .bg-purple-100 { background-color: rgb(168 85 247 / 0.28); }
+  html.dark .text-indigo-700,
+  html.dark .text-purple-700 { color: #c4b5fd; }
+
+  /* Dark-mode audit: pills, rings, links and the Source Code inspector's diff colours. */
+  html.dark .bg-rose-50 { background-color: rgb(244 63 94 / 0.14); }
+  html.dark .bg-rose-100 { background-color: rgb(244 63 94 / 0.25); }
+  html.dark .bg-slate-200 { background-color: #374151; }
+  html.dark .text-slate-700 { color: #e5e7eb; }
+  html.dark .text-rose-600,
+  html.dark .text-rose-800,
+  html.dark .text-rose-900 { color: #fda4af; }
+  html.dark .text-emerald-600,
+  html.dark .text-green-600,
+  html.dark .text-emerald-900 { color: #6ee7b7; }
+  html.dark .text-red-600 { color: #f87171; }
+  html.dark .border-red-300,
+  html.dark .border-rose-500 { border-color: rgb(248 113 113 / 0.55); }
+  html.dark .border-amber-300 { border-color: rgb(245 158 11 / 0.5); }
+  html.dark .border-indigo-300 { border-color: rgb(129 140 248 / 0.5); }
+  html.dark .ring-red-200,
+  html.dark .ring-red-300 { --tw-ring-color: rgb(220 38 38 / 0.4); }
+  html.dark .hover\:text-red-700:hover,
+  html.dark .hover\:text-red-600:hover { color: #fca5a5; }
+  html.dark .hover\:text-indigo-700:hover { color: #a5b4fc; }
+  html.dark .hover\:text-neutral-800:hover { color: #f3f4f6; }
+  html.dark .hover\:border-red-200:hover,
+  html.dark .hover\:border-red-300:hover { border-color: rgb(248 113 113 / 0.5); }
+  html.dark .hover\:border-indigo-300:hover { border-color: rgb(129 140 248 / 0.5); }
+
+  /* Command Center: the burgundy sidebar and Achievements card keep their brand colour in dark mode (they are
+     not remapped by the neutral rules above), and the top bar / panels use the dark surface. */
+  html.dark kbd { background-color: #1f2937; border-color: #374151; color: #d1d5db; }
+  html.dark .shadow-xs,
+  html.dark .shadow-sm { box-shadow: 0 1px 2px rgb(0 0 0 / 0.45); }
+  html.dark .hover\:bg-white:hover { background-color: #162033; }
+  html.dark .hover\:border-neutral-300:hover { border-color: #4b5563; }
   html.dark .bg-indigo-100 { background-color: rgb(99 102 241 / 0.28); }
   html.dark .text-red-700,
   html.dark .text-red-800 { color: #fca5a5; }

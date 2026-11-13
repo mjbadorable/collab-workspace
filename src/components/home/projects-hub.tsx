@@ -8,6 +8,7 @@ import { useProjects } from "@/lib/projects-context";
 import type { ProjectRecord } from "@/lib/projects";
 import LiveWorkItems from "./live-work-items";
 import { progressOf } from "./project-card";
+import ProjectEnvBadge from "./env-badge";
 import HealthPill from "./health-pill";
 import { ProjectGrip, ProjectMoveControls } from "./project-move-controls";
 import { Dossier, DossierSelector, FleetTechMatrix } from "./pokedex-dossier";
@@ -31,13 +32,13 @@ function HubCard({ project, drag }: { project: ProjectRecord; drag: DragProps })
       onDragOver={drag.onDragOver}
       onDrop={drag.onDrop}
       onDragEnd={drag.onDragEnd}
-      className={`rounded-lg transition ${drag.dragging ? "scale-98 opacity-50" : ""} ${drag.over ? "ring-2 ring-red-500" : ""}`}
+      className={`rounded-xl transition ${drag.dragging ? "scale-98 opacity-50" : ""} ${drag.over ? "ring-2 ring-red-500" : ""}`}
     >
-    <LiveWorkItems projectId={project.id} fallback={<div className="h-56 rounded-lg border border-neutral-200 bg-white" />}>
+    <LiveWorkItems projectId={project.id} fallback={<div className="h-56 rounded-xl border border-neutral-200 bg-white" />}>
       {(items) => {
         const { total, done, percent } = progressOf(items);
         return (
-          <div className="flex h-full flex-col rounded-lg border border-neutral-200 bg-white p-4 shadow-sm">
+          <div className="flex h-full flex-col rounded-xl border border-neutral-200 bg-white p-4 shadow-xs transition-shadow hover:shadow-md">
             <div className="flex items-start gap-3">
               <ProjectGrip projectId={project.id} name={project.name} />
               <ProjectAvatar project={project} />
@@ -68,8 +69,8 @@ function HubCard({ project, drag }: { project: ProjectRecord; drag: DragProps })
 
             <div className="mt-3">
               <div className="flex items-center justify-between text-xs text-neutral-600">
-                <span>{items ? `${done}/${total}` : "Loading…"}</span>
-                <span className="font-medium">{percent}%</span>
+                <span className="tabular-nums">{items ? `${done}/${total} done` : "Loading…"}</span>
+                <span className="font-medium tabular-nums">{percent}%</span>
               </div>
               <div
                 role="progressbar"
@@ -88,11 +89,10 @@ function HubCard({ project, drag }: { project: ProjectRecord; drag: DragProps })
               </div>
             </div>
 
-            {project.live_url && (
-              <div className="mt-3">
-                <HealthPill url={project.live_url} />
-              </div>
-            )}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <ProjectEnvBadge project={project} />
+              {project.live_url && <HealthPill url={project.live_url} />}
+            </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
               <div className="flex items-center gap-2">
@@ -107,7 +107,7 @@ function HubCard({ project, drag }: { project: ProjectRecord; drag: DragProps })
                   href={`/projects/${project.id}`}
                   className="rounded-md bg-red-600 px-2.5 py-1 font-medium text-white hover:bg-red-700"
                 >
-                  Open
+                  Open <span aria-hidden>→</span>
                 </Link>
               </div>
             </div>

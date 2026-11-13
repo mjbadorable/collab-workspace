@@ -172,7 +172,7 @@ function RepoHeader({ repo, name }: { repo: RepoStatus; name?: string }) {
   return (
     <>
       <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
-        {!repo.notFound && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />}
+        {!repo.notFound && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60 motion-reduce:animate-none" />}
         <span className={`relative inline-flex h-2 w-2 rounded-full ${repo.notFound ? "bg-neutral-300" : "bg-emerald-500"}`} />
       </span>
       <span className="text-sm font-semibold">{name ?? "Local Dev Engine"}</span>
@@ -363,7 +363,7 @@ export default function LocalDevWidget({
         <DeploymentGateModal projectId={active === "all" ? "collab-workspace" : active} open={gateOpen} onClose={() => setGateOpen(false)} />
         <div className="flex flex-wrap items-center gap-2">
           <span className="relative flex h-2 w-2 shrink-0" aria-hidden>
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60 motion-reduce:animate-none" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
           </span>
           <span className="text-sm font-semibold">Local Dev Engine</span>

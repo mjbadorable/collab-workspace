@@ -33,10 +33,11 @@ export default function GymBadgeCase() {
   const { badges, unlockedCount, level, xp, xpIntoLevel } = state;
 
   return (
-    <section aria-labelledby="gym-case" className="rounded-xl border border-neutral-700 bg-linear-to-br from-neutral-900 to-neutral-800 p-5 text-neutral-100 shadow-md">
+    <section aria-labelledby="gym-case" className="rounded-xl border border-white/10 bg-[#0c0d10] bg-linear-to-br from-[#14161b] to-[#090a0c] p-5 text-neutral-100 shadow-md">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="gym-case" className="text-sm font-semibold">
-          Gym Badge Case
+        <h2 id="gym-case" className="flex items-center gap-2 text-sm font-semibold">
+          Achievements
+          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-neutral-950">Lv. {level}</span>
         </h2>
         <span className="text-xs text-neutral-300">
           {unlockedCount}/{badges.length} badges · {xp} XP
@@ -53,7 +54,7 @@ export default function GymBadgeCase() {
           aria-valuemin={0}
           aria-valuemax={XP_PER_LEVEL}
           aria-valuenow={xpIntoLevel}
-          className="mt-1.5 h-2 overflow-hidden rounded-full bg-neutral-700"
+          className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/15"
         >
           <div className="h-full rounded-full bg-linear-to-r from-red-500 to-amber-400" style={{ width: `${(xpIntoLevel / XP_PER_LEVEL) * 100}%` }} />
         </div>
@@ -66,7 +67,7 @@ export default function GymBadgeCase() {
             <span className="relative">
               <BadgeGlyph badge={b} />
               {b.unlocked && (
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-neutral-900 ring-2 ring-neutral-900">
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-400 text-neutral-900 ring-2 ring-[#0c0d10]">
                   <Check className="h-3 w-3" strokeWidth={3} aria-hidden />
                 </span>
               )}

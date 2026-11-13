@@ -9,3 +9,6 @@ alter table public.projects add column if not exists live_url    text;
 alter table public.projects add column if not exists functions      text[];
 alter table public.projects add column if not exists frontend_stack text;
 alter table public.projects add column if not exists backend_stack  text;
+
+-- Make PostgREST pick up the new columns now (otherwise inserts fail with PGRST204 until its schema cache refreshes).
+notify pgrst, 'reload schema';

@@ -19,7 +19,7 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { supabase } from "@/lib/supabase";
 import { isLocalHost } from "./auth-gate";
-import PokeballIcon from "./pokeball-icon";
+import CollabLogo from "./collab-logo";
 import { useIsClient } from "@/lib/use-is-client";
 
 type Mode = "signin" | "signup";
@@ -277,7 +277,7 @@ export default function LoginForm() {
         </span>
       </div>
 
-      <div className="grid min-h-screen lg:grid-cols-2">
+      <div className="grid min-h-dvh lg:grid-cols-2">
         <aside
           className={`relative z-10 hidden flex-col justify-between bg-neutral-950 p-12 text-white transition-transform duration-700 ease-in-out motion-reduce:transition-none lg:flex lg:pr-16 ${
             doorsApart ? "-translate-x-full opacity-90" : "translate-x-0"
@@ -289,10 +289,7 @@ export default function LoginForm() {
             aria-hidden
           />
           <div>
-            <div className="flex items-center gap-2.5">
-              <PokeballIcon className="h-7 w-7" />
-              <span className="text-lg font-semibold">Silph DevOps · Collaborative Engineering Portal</span>
-            </div>
+            <CollabLogo variant="full" onDark className="h-10 w-10" />
             <h2 className="mt-16 max-w-lg text-4xl font-semibold leading-tight">
               The central engineering hub for agile software teams.
             </h2>
@@ -326,8 +323,7 @@ export default function LoginForm() {
           }`}
         >
           <div className="mb-6 flex items-center gap-2 lg:hidden">
-            <PokeballIcon className="h-6 w-6" />
-            <span className="font-semibold">Silph DevOps Portal</span>
+            <CollabLogo variant="full" className="h-8 w-8" />
           </div>
           <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
             <h1 className="text-lg font-semibold">Welcome to Collab Workspace</h1>

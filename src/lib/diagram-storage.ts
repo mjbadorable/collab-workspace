@@ -289,6 +289,45 @@ export function resetCustomFlow(projectId: string, category: FlowCategory): void
   }
 }
 
+// ---- custom layout: optional dragged positions per step. A step without one keeps the automatic left-to-right layout.
+
+export type FlowPosition = { x: number; y: number };
+export type FlowLayout = Record<string, FlowPosition>;
+
+const layoutKey = (projectId: string, category: FlowCategory) => `collab-workspace:flow-layout:${projectId}:${category}`;
+
+const isPosition = (v: unknown): v is FlowPosition =>
+  typeof v === "object" && v !== null && Number.isFinite((v as FlowPosition).x) && Number.isFinite((v as FlowPosition).y);
+
+export function getFlowLayout(projectId: string, category: FlowCategory): FlowLayout {
+  try {
+    const raw = localStorage.getItem(layoutKey(projectId, category));
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+      return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, FlowPosition] => isPosition(entry[1])));
+    }
+  } catch {
+    // corrupt JSON or storage blocked: automatic layout
+  }
+  return {};
+}
+
+export function saveFlowLayout(projectId: string, category: FlowCategory, layout: FlowLayout): void {
+  try {
+    localStorage.setItem(layoutKey(projectId, category), JSON.stringify(layout));
+  } catch {
+    // storage blocked: the layout lasts until the page is reloaded
+  }
+}
+
+export function resetFlowLayout(projectId: string, category: FlowCategory): void {
+  try {
+    localStorage.removeItem(layoutKey(projectId, category));
+  } catch {
+    // nothing stored to remove
+  }
+}
+
 export function getFlow(projectId: string, category: FlowCategory): Flow {
   const custom = readCustomFlow(projectId, category);
   if (custom) return { category, ...meta[category], steps: custom };

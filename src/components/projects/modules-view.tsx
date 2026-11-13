@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { metaFromParsed, parseDescription, serializeDescription } from "@/lib/checklist";
 import { createModule, getModules, updateModule, type ProjectModule } from "@/lib/modules";
 import { useProfile } from "@/lib/profile-context";
@@ -12,8 +12,6 @@ import { workItemKey, type StoredWorkItem, type WorkItemStatus } from "@/lib/wor
 import { ProjectNotFound } from "./project-overview";
 import AssignTicketsDialog from "./assign-tickets-dialog";
 import WorkItemsSource from "./work-items-source";
-
-const MAX_TICKETS = 6;
 
 const STATUS_LABEL: Record<WorkItemStatus, string> = { backlog: "Backlog", in_progress: "In Progress", done: "Done" };
 
@@ -31,73 +29,95 @@ function ModuleCard({
   projectId,
   module,
   items,
+  blockedCount,
   onAssign,
 }: {
   projectId: string;
   module: ProjectModule;
   items: StoredWorkItem[];
+  blockedCount: number;
   onAssign: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const done = items.filter((i) => i.status === "done").length;
   const percent = items.length ? Math.round((done / items.length) * 100) : 0;
-  const shown = items.slice(0, MAX_TICKETS);
+  const panelId = `module-${module.id}`;
 
   return (
-    <li className="flex flex-col rounded-xl border border-neutral-200 bg-white p-5 shadow-xs">
-      <div className="flex items-start gap-3">
+    <li className="rounded-xl border border-neutral-200 bg-white shadow-xs">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        onClick={() => setExpanded((e) => !e)}
+        className="flex w-full items-start gap-3 rounded-xl p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+      >
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-xl" aria-hidden>
           {module.icon}
         </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold">{module.name}</h2>
-          {module.lead && (
-            <span className="mt-1 inline-block rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-              Lead: {module.lead}
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-sm font-semibold">{module.name}</span>
+            {module.lead && <span className="text-xs text-neutral-500">Owner: {module.lead}</span>}
+          </span>
+          {module.description && <span className="mt-0.5 line-clamp-1 block text-xs text-neutral-500">{module.description}</span>}
+          <span className="mt-2 flex items-center gap-2">
+            <span
+              role="progressbar"
+              aria-label={`${module.name} progress`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-100"
+            >
+              <span className="block h-full rounded-full bg-linear-to-r from-red-500 to-amber-400" style={{ width: `${percent}%` }} />
             </span>
-          )}
-        </div>
-      </div>
-      {module.description && <p className="mt-3 text-sm text-neutral-500">{module.description}</p>}
-
-      <div className="mt-4">
-        <div
-          role="progressbar"
-          aria-label={`${module.name} progress`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          className="h-2 overflow-hidden rounded-full bg-neutral-100"
-        >
-          <div className="h-full rounded-full bg-linear-to-r from-red-500 to-amber-400" style={{ width: `${percent}%` }} />
-        </div>
-        <p className="mt-1 text-xs text-neutral-500">
-          {done}/{items.length} tasks completed · {percent}%
-        </p>
-      </div>
-
-      {shown.length > 0 ? (
-        <ul className="mt-3 space-y-1">
-          {shown.map((i) => (
-            <li key={i.id}>
-              <Link href={`/projects/${projectId}/work-items`} className="flex items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-neutral-50">
-                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-neutral-600">{workItemKey(projectId, i.seq)}</span>
-                <span className={`min-w-0 flex-1 truncate ${i.status === "done" ? "text-neutral-400 line-through" : "text-neutral-700"}`}>{i.title}</span>
-                <span className="shrink-0 text-neutral-500">{STATUS_LABEL[i.status]}</span>
-              </Link>
-            </li>
-          ))}
-          {items.length > shown.length && <li className="px-1 text-xs text-neutral-500">+{items.length - shown.length} more</li>}
-        </ul>
-      ) : (
-        <p className="mt-3 text-xs text-neutral-500">No tickets linked yet.</p>
-      )}
-      <button
-        type="button"
-        onClick={onAssign}
-        className="mt-3 w-fit rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
-      >
-        Assign tickets
+            <span className="w-9 text-right text-xs font-medium tabular-nums text-neutral-700">{percent}%</span>
+          </span>
+          <span className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 tabular-nums text-neutral-600">
+              {done}/{items.length} tasks
+            </span>
+            <span
+              className={`rounded-full border px-2 py-0.5 tabular-nums ${
+                blockedCount > 0 ? "border-red-200 bg-red-50 font-medium text-red-700" : "border-neutral-200 bg-neutral-50 text-neutral-500"
+              }`}
+            >
+              {blockedCount} {blockedCount === 1 ? "blocker" : "blockers"}
+            </span>
+          </span>
+        </span>
+        <ChevronDown className={`mt-1 h-4 w-4 shrink-0 text-neutral-400 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden />
       </button>
+
+      {expanded && (
+        <div id={panelId} className="border-t border-neutral-100 px-4 pb-4 pt-3">
+          {module.description && <p className="text-sm text-neutral-600">{module.description}</p>}
+          <h3 className="mt-3 text-xs font-semibold uppercase tracking-wide text-neutral-400">Linked tasks</h3>
+          {items.length > 0 ? (
+            <ul className="mt-1.5 space-y-1">
+              {items.map((i) => (
+                <li key={i.id}>
+                  <Link href={`/projects/${projectId}/work-items`} className="flex items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-neutral-50">
+                    <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-neutral-600">{workItemKey(projectId, i.seq)}</span>
+                    <span className={`min-w-0 flex-1 truncate ${i.status === "done" ? "text-neutral-400 line-through" : "text-neutral-700"}`}>{i.title}</span>
+                    <span className="shrink-0 text-neutral-500">{STATUS_LABEL[i.status]}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1.5 text-xs text-neutral-500">No tickets linked yet.</p>
+          )}
+          <button
+            type="button"
+            onClick={onAssign}
+            className="mt-3 w-fit rounded-md border border-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+          >
+            Assign tickets
+          </button>
+        </div>
+      )}
     </li>
   );
 }
@@ -202,6 +222,7 @@ function Modules({
   const [creating, setCreating] = useState(false);
   const [assigning, setAssigning] = useState<ProjectModule | null>(null);
   const live = (items ?? []).filter((i) => !i.deleted_at).sort((a, b) => a.seq - b.seq);
+  const statusByKey = new Map(live.map((i) => [workItemKey(projectId, i.seq).toUpperCase(), i.status] as const));
 
   return (
     <>
@@ -219,7 +240,17 @@ function Modules({
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">
           {modules.map((m) => (
-            <ModuleCard key={m.id} projectId={projectId} module={m} items={itemsOfModule(projectId, m, live)} onAssign={() => setAssigning(m)} />
+            <ModuleCard
+              key={m.id}
+              projectId={projectId}
+              module={m}
+              items={itemsOfModule(projectId, m, live)}
+              blockedCount={itemsOfModule(projectId, m, live).filter((i) => {
+                const by = parseDescription(i.description).blockedBy;
+                return i.status !== "done" && by !== null && statusByKey.get(by.toUpperCase()) !== "done";
+              }).length}
+              onAssign={() => setAssigning(m)}
+            />
           ))}
         </ul>
       )}
@@ -266,13 +297,6 @@ export default function ModulesView({ projectId }: { projectId: string }) {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
-      <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-sm text-neutral-500">
-        <Link href="/projects" className="hover:text-neutral-900">Projects</Link>
-        <span aria-hidden>›</span>
-        <Link href={`/projects/${project.id}`} className="hover:text-neutral-900">{project.name}</Link>
-        <span aria-hidden>›</span>
-        <span className="text-neutral-900">Modules</span>
-      </nav>
       <h1 className="mb-1 text-xl font-semibold">Modules</h1>
       <p className="mb-6 text-sm text-neutral-500">Group related work into functional feature epics and track each one&apos;s progress.</p>
       {/* Remounted per project so the module list never shows another project's data. */}

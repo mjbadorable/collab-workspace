@@ -16,21 +16,27 @@ import {
   useReactFlow,
   type Edge,
   type Node,
+  type NodeChange,
   type NodeProps,
   type NodeTypes,
 } from "@xyflow/react";
-import { Check, Code2, Copy, Maximize2, Pencil } from "lucide-react";
+import { Check, Code2, Copy, Maximize2, Pencil, RotateCcw, X } from "lucide-react";
 import FlowStepsDialog from "./flow-steps-dialog";
 import { ProjectNotFound } from "@/components/projects/project-overview";
 import {
   flowCategories,
   getFlow,
+  getFlowLayout,
   getMermaidForCategory,
   hasCustomFlow,
   parseFlowCategory,
   resetCustomFlow,
+  resetFlowLayout,
   saveCustomFlow,
+  saveFlowLayout,
   type FlowCategory,
+  type FlowLayout,
+  type FlowPosition,
   type FlowStep,
   type FlowStepKind,
 } from "@/lib/diagram-storage";
@@ -48,7 +54,7 @@ const kindStyle: Record<FlowStepKind, { shape: string; tone: string; tag: string
   decision: { shape: "rounded-lg px-4", tone: "border-amber-300 bg-amber-50", tag: "Decision" },
 };
 
-// Read-only: handles exist so edges attach, but nothing can be connected or edited.
+// Nodes can be dragged (the position is saved per step); handles exist so edges attach, but nothing can be connected.
 function StepNodeView({ data, selected }: NodeProps<StepNode>) {
   const style = kindStyle[data.kind];
   return (
@@ -97,7 +103,7 @@ function MermaidDialog({ open, onClose, code }: { open: boolean; onClose: () => 
       onClose={onClose}
       onClick={(e) => e.target === e.currentTarget && onClose()}
       aria-label="Raw Mermaid code"
-      className="m-auto w-full max-w-2xl rounded-xl border border-neutral-200 p-0 shadow-xl backdrop:bg-black/30"
+      className="drawer-panel ml-auto mr-0 mt-0 mb-0 h-dvh max-h-dvh w-full max-w-xl overflow-y-auto rounded-none border-0 border-l border-neutral-200 p-0 shadow-2xl backdrop:bg-black/30"
     >
       {open && (
         <div className="p-5">
@@ -153,7 +159,92 @@ function SequenceCard({ step, index, active, onSelect }: { step: FlowStep; index
   );
 }
 
-function Viewer({ projectId, projectName, category }: { projectId: string; projectName: string; category: FlowCategory }) {
+const KIND_OPTIONS: { value: FlowStepKind; label: string }[] = [
+  { value: "terminal", label: "Start / End" },
+  { value: "process", label: "Process" },
+  { value: "decision", label: "Decision" },
+];
+
+// Floating editor for the selected node: label and type without opening the full "Edit Steps" dialog.
+function StepQuickEditor({
+  step,
+  index,
+  onApply,
+  onRunbook,
+  onClose,
+}: {
+  step: FlowStep;
+  index: number;
+  onApply: (patch: Pick<FlowStep, "label" | "kind">) => void;
+  onRunbook: () => void;
+  onClose: () => void;
+}) {
+  const [label, setLabel] = useState(step.label);
+  const [kind, setKind] = useState<FlowStepKind>(step.kind);
+  const changed = label.trim() !== step.label || kind !== step.kind;
+  const valid = label.trim() !== "";
+
+  return (
+    <form
+      aria-label={`Edit step ${index}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (changed && valid) onApply({ label: label.trim(), kind });
+      }}
+      className="absolute right-3 top-3 z-10 w-64 space-y-2 rounded-lg border border-neutral-200 bg-white p-3 shadow-lg"
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Step {index}</h3>
+        <button type="button" onClick={onClose} aria-label="Close step editor" className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700">
+          <X className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
+      <div>
+        <label htmlFor="qe-label" className="mb-1 block text-xs font-medium text-neutral-600">
+          Label
+        </label>
+        <input
+          id="qe-label"
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          maxLength={80}
+          className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+        />
+      </div>
+      <div>
+        <label htmlFor="qe-kind" className="mb-1 block text-xs font-medium text-neutral-600">
+          Type
+        </label>
+        <select
+          id="qe-kind"
+          value={kind}
+          onChange={(e) => setKind(KIND_OPTIONS.find((o) => o.value === e.target.value)?.value ?? kind)}
+          className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+        >
+          {KIND_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <button type="button" onClick={onRunbook} className="text-xs font-medium text-red-600 hover:underline">
+          Runbook &amp; notes →
+        </button>
+        <button
+          type="submit"
+          disabled={!changed || !valid}
+          className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-40"
+        >
+          Apply
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function Viewer({ projectId, category }: { projectId: string; category: FlowCategory }) {
   const { fitView } = useReactFlow();
   // Bumped after the steps are edited, so the canvas, the cards and the Mermaid code are read again.
   const [version, setVersion] = useState(0);
@@ -162,6 +253,9 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
   const flow = useMemo(() => getFlow(projectId, category), [projectId, category, version]);
   const mermaid = useMemo(() => getMermaidForCategory(projectId, category), [projectId, category, version]);
   /* eslint-enable react-hooks/exhaustive-deps */
+  // Dragged positions are saved per step; `dragging` holds the in-flight position while a node is held.
+  const [layout, setLayout] = useState<FlowLayout>(() => getFlowLayout(projectId, category));
+  const [dragging, setDragging] = useState<FlowLayout>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showCode, setShowCode] = useState(false);
   const [inspectedId, setInspectedId] = useState<string | null>(null);
@@ -172,13 +266,13 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
       flow.steps.map((s, i) => ({
         id: s.id,
         type: s.kind,
-        position: { x: i * 270, y: 0 },
+        position: dragging[s.id] ?? layout[s.id] ?? { x: i * 270, y: 0 },
         data: { label: s.label, index: i + 1, kind: s.kind },
         selected: s.id === selectedId,
-        draggable: false,
+        draggable: true,
         connectable: false,
       })),
-    [flow, selectedId]
+    [flow, selectedId, layout, dragging]
   );
   const edges = useMemo<Edge[]>(
     () =>
@@ -197,16 +291,49 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
     if (version > 0) void fitView({ duration: 300, padding: 0.2 });
   }, [version, fitView]);
 
-  // Clicking a step (card or node) opens its runbook so edge cases can be documented on the flow itself.
+  // Clicking a step (card or node) selects it and opens the quick editor; the runbook opens from there.
   const inspect = (id: string) => setInspectedId(id);
 
   const select = (id: string) => {
     setSelectedId(id);
     void fitView({ nodes: [{ id }], duration: 300, maxZoom: 1.1, padding: 0.6 });
-    inspect(id);
   };
 
   const inspectedStep = flow.steps.find((s) => s.id === inspectedId) ?? null;
+  const selectedStep = flow.steps.find((s) => s.id === selectedId) ?? null;
+
+  const onNodesChange = (changes: NodeChange<StepNode>[]) => {
+    for (const change of changes) {
+      if (change.type === "position" && change.position) {
+        const { id, position } = change;
+        setDragging((d) => ({ ...d, [id]: position }));
+      }
+    }
+  };
+
+  const onNodeDragStop = (node: StepNode) => {
+    const next: FlowLayout = { ...layout, [node.id]: { x: node.position.x, y: node.position.y } satisfies FlowPosition };
+    setLayout(next);
+    setDragging({});
+    saveFlowLayout(projectId, category, next);
+  };
+
+  const resetLayout = () => {
+    resetFlowLayout(projectId, category);
+    setLayout({});
+    setDragging({});
+    requestAnimationFrame(() => void fitView({ duration: 300, padding: 0.2 }));
+  };
+
+  // Quick label / type edit from the canvas. Saved like "Edit Steps": the flow becomes the project's own copy.
+  const applyStepEdit = (id: string, patch: Pick<FlowStep, "label" | "kind">) => {
+    saveCustomFlow(
+      projectId,
+      category,
+      flow.steps.map((s) => (s.id === id ? { ...s, ...patch } : s))
+    );
+    setVersion((v) => v + 1);
+  };
 
   const meta = flowCategories.find((c) => c.value === category)!;
   const base = `/projects/${projectId}`;
@@ -214,17 +341,9 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
   return (
     <div className="flex min-h-full flex-col">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-neutral-200 bg-white px-4 py-2 text-sm">
-        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 text-neutral-500">
-          <Link href="/projects" className="hover:text-neutral-900">
-            Projects
-          </Link>
-          <span aria-hidden>›</span>
-          <Link href={base} className="truncate hover:text-neutral-900">
-            {projectName}
-          </Link>
-          <span aria-hidden>›</span>
-          <span className="text-neutral-900">Flowchart / Diagrams</span>
-        </nav>
+        <p className="text-sm text-neutral-500">
+          <span className="font-medium text-neutral-800">{meta.label}</span> · {meta.title}
+        </p>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -232,6 +351,15 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
             className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-neutral-700 hover:bg-neutral-100"
           >
             <Maximize2 className="h-4 w-4" aria-hidden /> Fit to View
+          </button>
+          <button
+            type="button"
+            onClick={resetLayout}
+            disabled={Object.keys(layout).length === 0}
+            title="Clear dragged positions and go back to the automatic layout"
+            className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-1 text-neutral-700 hover:bg-neutral-100 disabled:opacity-40"
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden /> Reset Layout
           </button>
           <button
             type="button"
@@ -267,16 +395,12 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
         ))}
       </div>
 
-      <p className="px-4 pt-3 text-sm text-neutral-500">
-        <span className="font-medium text-neutral-800">{meta.label}</span> · {meta.title}
-      </p>
-
-      <div className="mx-4 mt-3 h-[26rem] overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+      <div className="relative mx-4 mt-3 h-[max(26rem,calc(100dvh-24rem))] overflow-hidden rounded-xl border border-neutral-200 bg-neutral-50">
         <ReactFlow
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          nodesDraggable={false}
+          nodesDraggable
           nodesConnectable={false}
           elementsSelectable
           panOnDrag
@@ -284,17 +408,28 @@ function Viewer({ projectId, projectName, category }: { projectId: string; proje
           fitView
           fitViewOptions={{ padding: 0.2 }}
           colorMode={theme}
-          onNodeClick={(_, node) => {
-            setSelectedId(node.id);
-            inspect(node.id);
-          }}
+          onNodesChange={onNodesChange}
+          onNodeDragStop={(_, node) => onNodeDragStop(node)}
+          snapToGrid
+          snapGrid={[20, 20]}
+          onNodeClick={(_, node) => setSelectedId(node.id)}
           onPaneClick={() => setSelectedId(null)}
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={20} />
           <MiniMap pannable zoomable />
-          <Controls showInteractive={false} />
+          <Controls showInteractive={false} fitViewOptions={{ padding: 0.2, duration: 300 }} />
         </ReactFlow>
+        {selectedStep && (
+          <StepQuickEditor
+            key={`${selectedStep.id}:${selectedStep.label}:${selectedStep.kind}`}
+            step={selectedStep}
+            index={flow.steps.indexOf(selectedStep) + 1}
+            onApply={(patch) => applyStepEdit(selectedStep.id, patch)}
+            onRunbook={() => inspect(selectedStep.id)}
+            onClose={() => setSelectedId(null)}
+          />
+        )}
       </div>
 
       <section aria-label="Step-by-step sequence" className="px-4 py-6">
@@ -355,7 +490,7 @@ export default function DiagramEditor({ projectId }: { projectId: string }) {
   if (!project) return <ProjectNotFound />;
   return (
     <ReactFlowProvider key={`${projectId}:${category}`}>
-      <Viewer projectId={projectId} projectName={project.name} category={category} />
+      <Viewer projectId={projectId} category={category} />
     </ReactFlowProvider>
   );
 }

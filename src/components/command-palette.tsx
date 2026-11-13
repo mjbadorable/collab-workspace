@@ -64,6 +64,7 @@ function PaletteBody({
       { id: "qa-theme", group: "Quick Actions", label: "Toggle Theme: Poké-Center Light / Silph Co. Dark", run: toggleTheme },
       { id: "qa-home", group: "Quick Actions", label: "Go to Home", run: go("/") },
       { id: "qa-projects", group: "Quick Actions", label: "Go to Projects Hub", run: go("/projects") },
+      { id: "qa-inbox", group: "Quick Actions", label: "Go to Inbox", run: go("/inbox") },
       { id: "qa-settings", group: "Quick Actions", label: "Go to Settings", run: go("/settings") },
       { id: "qa-trash", group: "Quick Actions", label: "Go to Trash", run: go("/trash") },
     ];
@@ -76,6 +77,7 @@ function PaletteBody({
         ["System Architecture", "/architecture"],
         ["Process Flowcharts", "/diagrams?category=user"],
         ["Analytics", "/dashboards"],
+        ["Source Code", "/source"],
         ["Settings", "/settings"],
       ];
       for (const [view, path] of views) {

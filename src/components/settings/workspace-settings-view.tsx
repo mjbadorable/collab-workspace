@@ -61,7 +61,7 @@ function BackupSection() {
   };
 
   return (
-    <div className="max-w-md rounded-lg border border-neutral-200 p-4">
+    <div className="max-w-md rounded-xl border border-neutral-200 bg-white p-4 shadow-xs">
       <h3 className="text-sm font-semibold">Workspace Backup &amp; Cross-Device Migration</h3>
       <p className="mt-1 text-sm text-neutral-500">
         Save everything stored on this device as one file, and restore it on another device or browser. The file includes
@@ -127,7 +127,7 @@ function General() {
 
       <BackupSection />
 
-      <div className="max-w-md rounded-lg border border-red-200 p-4">
+      <div className="max-w-md rounded-xl border border-red-200 bg-white p-4 shadow-xs">
         <h3 className="text-sm font-semibold text-red-700">Danger zone</h3>
         <p className="mt-1 text-sm text-neutral-500">Deleting a workspace removes all of its projects and data.</p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -203,7 +203,7 @@ function Members({ workspaceId }: { workspaceId: string }) {
       {members === null ? (
         <p className="mt-6 py-12 text-center text-sm text-neutral-500">Loading members…</p>
       ) : (
-        <ul className="mt-4 divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+        <ul className="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 bg-white">
           {members.map((m) => (
             <li key={m.user_id} className="flex items-center gap-3 px-4 py-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
@@ -239,7 +239,7 @@ function LocalMembers() {
   return (
     <div>
       <h2 className="text-base font-semibold">Members</h2>
-      <ul className="mt-4 divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+      <ul className="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 bg-white">
         <li className="flex items-center gap-3 px-4 py-3">
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
             {initials(mockUser.name)}

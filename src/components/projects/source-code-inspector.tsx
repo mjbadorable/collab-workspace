@@ -295,7 +295,7 @@ export default function SourceCodeInspector({ projectId }: { projectId: string }
     });
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-[calc(100dvh-13rem)] min-h-[32rem] flex-col">
       <header className="border-b border-neutral-200 px-6 py-3">
         <h1 className="text-base font-semibold">Source Code</h1>
         <p className="text-xs text-neutral-500">Read-only view of {project.name} on this machine. Secrets and build folders are hidden.</p>

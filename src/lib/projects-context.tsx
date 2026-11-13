@@ -10,9 +10,11 @@ import {
   fetchCloudProjects,
   getProjectDiagrams,
   getProjects,
+  isSchemaStale,
   mergeRemoteProjects,
   pushCloudProject,
   removeCloudProject,
+  SCHEMA_NOTICE,
   SEED_PROJECTS,
   subscribeProjects,
   updateLocalProject,
@@ -96,7 +98,8 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const mirror = useCallback((run: (workspaceId: string) => Promise<void>) => {
     if (!workspaceId) return;
     run(workspaceId).then(
-      () => setSyncError(null),
+      // The write succeeded with the core columns only: say so once, instead of failing on every save.
+      () => setSyncError(isSchemaStale() ? SCHEMA_NOTICE : null),
       (e) => setSyncError(e instanceof Error ? e.message : "Could not sync the project to the cloud.")
     );
   }, [workspaceId]);

@@ -73,14 +73,15 @@ export default function EnvironmentSwitcher() {
     };
   }, [env, projectId]);
 
-  if (!env) return <div className="h-14" aria-hidden />;
+  // The placeholder keeps the card's size, so the sidebar does not jump once the stored choice is read.
+  if (!env) return <div className="h-[5.5rem] rounded-xl border border-white/10 bg-white/[0.05]" aria-hidden />;
 
   const branch = branchInfo?.projectId === projectId ? branchInfo.branch : null;
   const liveUrl = currentProject?.live_url;
 
   return (
-    <div>
-      <div role="radiogroup" aria-label="Environment" className="grid grid-cols-2 gap-0.5 rounded-full border border-neutral-200 bg-white p-0.5 shadow-sm">
+    <div className="rounded-xl border border-white/10 bg-white/[0.05] p-2.5 text-neutral-200">
+      <div role="radiogroup" aria-label="Environment" className="grid grid-cols-2 gap-0.5 rounded-full border border-white/10 bg-black/30 p-0.5">
         {OPTIONS.map(({ value, label, Icon }) => {
           const active = env === value;
           return (
@@ -90,12 +91,12 @@ export default function EnvironmentSwitcher() {
               role="radio"
               aria-checked={active}
               onClick={() => setEnv(value)}
-              className={`flex items-center justify-center gap-1.5 rounded-full px-2 py-1 text-xs transition-colors ${
+              className={`flex items-center justify-center gap-1.5 rounded-full border px-2 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
                 active
                   ? value === "production"
-                    ? "bg-red-600 font-medium text-white"
-                    : "bg-amber-500 font-medium text-white"
-                  : "text-neutral-500 hover:bg-neutral-100"
+                    ? "border-emerald-500/30 bg-emerald-500/20 font-medium text-emerald-300"
+                    : "border-transparent bg-amber-500 font-semibold text-neutral-950"
+                  : "border-transparent text-neutral-400 hover:bg-white/5 hover:text-white"
               }`}
             >
               <Icon className="h-3.5 w-3.5" aria-hidden />
@@ -104,7 +105,7 @@ export default function EnvironmentSwitcher() {
           );
         })}
       </div>
-      <p className="mt-1 truncate px-2 font-mono text-[11px] text-neutral-500" aria-live="polite">
+      <p className="mt-1.5 truncate px-1 font-mono text-[11px] text-neutral-400" aria-live="polite">
         {env === "production"
           ? liveUrl
             ? hostOf(liveUrl)
@@ -112,7 +113,7 @@ export default function EnvironmentSwitcher() {
           : `localhost:3000 · localhost:5173${branch ? ` · ${branch}` : ""}`}
       </p>
       {env === "staging" && (
-        <p className="mt-0.5 px-2 text-[11px] leading-snug text-amber-700">
+        <p className="mt-0.5 px-1 text-[11px] leading-snug text-amber-300">
           🧪 Staging Mode Active — Smoke Test Runner available in{" "}
           <Link href={`/projects/${projectId}`} className="font-medium underline-offset-2 hover:underline">
             Project Overview

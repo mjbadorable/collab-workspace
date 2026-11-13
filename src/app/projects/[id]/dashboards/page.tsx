@@ -1,9 +1,7 @@
 "use client";
 
 import { Suspense, use } from "react";
-import Link from "next/link";
 import ProjectAnalytics from "@/components/projects/project-analytics";
-import { projectIdentifier } from "@/lib/work-items-storage";
 
 type Params = Promise<{ id: string }>;
 
@@ -11,19 +9,9 @@ type Params = Promise<{ id: string }>;
 function Content({ params }: { params: Params }) {
   const { id } = use(params);
   return (
-    <div className="mx-auto max-w-5xl px-6 py-8">
-      <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-sm text-neutral-500">
-        <Link href="/projects" className="hover:text-neutral-900">
-          Projects
-        </Link>
-        <span aria-hidden>›</span>
-        <Link href={`/projects/${id}`} className="hover:text-neutral-900">
-          {projectIdentifier(id)}
-        </Link>
-        <span aria-hidden>›</span>
-        <span className="text-neutral-900">Dashboards</span>
-      </nav>
-      <h1 className="mb-4 text-xl font-semibold">Dashboards</h1>
+    <div className="mx-auto w-full max-w-7xl px-6 py-8">
+      <h1 className="text-xl font-semibold">Analytics</h1>
+      <p className="mb-4 mt-1 text-sm text-neutral-500">Status, priority, velocity, cycle and module progress, and engineering hygiene for this project.</p>
       <ProjectAnalytics projectId={id} detailed />
     </div>
   );

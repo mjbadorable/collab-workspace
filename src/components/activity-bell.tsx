@@ -4,14 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { Activity, Bell, FolderPlus, ListChecks, Send, type LucideIcon } from "lucide-react";
 import { clearActivityLog, markActivitySeen, useActivityLog, type ActivityKind } from "@/lib/activity-log";
 
-const ICONS: Record<ActivityKind, { icon: LucideIcon; tone: string }> = {
+export const ACTIVITY_ICONS: Record<ActivityKind, { icon: LucideIcon; tone: string }> = {
   task: { icon: ListChecks, tone: "bg-indigo-100 text-indigo-700" },
   health: { icon: Activity, tone: "bg-red-100 text-red-700" },
   project: { icon: FolderPlus, tone: "bg-emerald-100 text-emerald-700" },
   webhook: { icon: Send, tone: "bg-amber-100 text-amber-700" },
 };
 
-function timeAgo(ts: number): string {
+export function timeAgo(ts: number): string {
   const minutes = Math.max(0, Math.floor((Date.now() - ts) / 60_000));
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes}m ago`;
@@ -21,7 +21,7 @@ function timeAgo(ts: number): string {
 }
 
 // Bell with an unread badge; the panel lists recent activity (kept on this device) and opening it marks everything read.
-export default function ActivityBell() {
+export default function ActivityBell({ align = "left" }: { align?: "left" | "right" }) {
   const { events, unread } = useActivityLog();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -68,7 +68,7 @@ export default function ActivityBell() {
         <div
           role="dialog"
           aria-label="Recent activity"
-          className="absolute left-0 top-full z-30 mt-1 w-72 rounded-lg border border-neutral-200 bg-white shadow-xl"
+          className={`absolute ${align === "right" ? "right-0" : "left-0"} top-full z-30 mt-1 w-80 rounded-lg border border-neutral-200 bg-white shadow-xl`}
         >
           <div className="flex items-center justify-between border-b border-neutral-100 px-3 py-2">
             <h2 className="text-sm font-semibold">Activity</h2>
@@ -83,7 +83,7 @@ export default function ActivityBell() {
           ) : (
             <ul className="max-h-80 divide-y divide-neutral-100 overflow-y-auto">
               {events.map((e) => {
-                const { icon: Icon, tone } = ICONS[e.kind];
+                const { icon: Icon, tone } = ACTIVITY_ICONS[e.kind];
                 return (
                   <li key={e.id} className="flex items-start gap-2.5 px-3 py-2.5">
                     <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${tone}`}>

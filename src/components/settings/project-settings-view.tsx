@@ -81,7 +81,7 @@ function WebhookAlerts({ project }: { project: ProjectRecord }) {
   };
 
   return (
-    <div className="max-w-lg rounded-lg border border-neutral-200 p-4">
+    <div className="max-w-lg rounded-xl border border-neutral-200 bg-white p-4 shadow-xs">
       <h3 className="text-sm font-semibold">Webhook Alerts (Discord / Slack)</h3>
       <p className="mt-1 text-sm text-neutral-500">
         Get a message in your channel when this project&apos;s production URL stops responding.
@@ -204,7 +204,7 @@ function General({ project }: { project: ProjectRecord }) {
 
       <WebhookAlerts key={project.id} project={project} />
 
-      <div className="max-w-lg rounded-lg border border-red-200 p-4">
+      <div className="max-w-lg rounded-xl border border-red-200 bg-white p-4 shadow-xs">
         <h3 className="text-sm font-semibold text-red-700">Danger zone</h3>
         <p className="mt-1 text-sm text-neutral-500">
           Removes the project from your workspace. Its work items stay stored and can be recovered by re-creating a project with the same identifier.
@@ -293,7 +293,7 @@ function Members({ workspaceId }: { workspaceId: string }) {
 
 function Rows({ rows }: { rows: { key: string; name: string; role: string }[] }) {
   return (
-    <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+    <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 bg-white">
       {rows.map((r) => (
         <li key={r.key} className="flex items-center gap-3 px-4 py-3">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-100 text-xs font-semibold text-red-700">
@@ -354,7 +354,7 @@ function WorkItemTypes({ projectId }: { projectId: string }) {
       </p>
       <LiveWorkItems projectId={projectId} fallback={<div className="h-64" />}>
         {(items) => (
-          <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+          <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 bg-white">
             {itemTypes.map(({ label, icon: Icon, isDefault }) => (
               <li key={label} className="flex items-center gap-3 px-4 py-3">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-600">
@@ -401,7 +401,7 @@ function CountList<T extends { value: string; label: string }>({
       <p className="max-w-2xl text-sm text-neutral-500">{note}</p>
       <LiveWorkItems projectId={projectId} fallback={<div className="h-40" />}>
         {(items) => (
-          <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+          <ul className="divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 bg-white">
             {options.map((o) => (
               <li key={o.value} className="flex items-center justify-between px-4 py-3 text-sm">
                 <span className="font-medium">{o.label}</span>
@@ -482,7 +482,7 @@ export default function ProjectSettingsView({ projectId }: { projectId: string }
           {tab === "qa" && (
             <div className="space-y-4">
               <h2 className="text-base font-semibold">QA results</h2>
-              <div className="rounded-lg border border-dashed border-neutral-300 px-6 py-12 text-center">
+              <div className="rounded-xl border border-dashed border-neutral-300 bg-white px-6 py-12 text-center">
                 <p className="text-sm font-medium">No QA runs yet</p>
                 <p className="mt-1 text-sm text-neutral-500">Test runs and QA templates for this project will appear here.</p>
               </div>

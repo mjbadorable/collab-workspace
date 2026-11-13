@@ -15,7 +15,7 @@ export default function Greeting({ name }: { name: string }) {
   const salutation = useSyncExternalStore(subscribe, timeOfDay, () => "Hello");
   return (
     <h1 className="text-2xl font-semibold">
-      {salutation}, {name}
+      {salutation}, {name} <span aria-hidden>👋</span>
     </h1>
   );
 }

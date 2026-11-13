@@ -294,6 +294,33 @@ export function mergeRemoteProjects(rows: Project[]) {
 
 // ---------------------------------------------------------------- cloud mirror
 
+type DbError = { code?: string; message: string } | null;
+
+export const SCHEMA_NOTICE =
+  "The Supabase projects table is missing newer columns (e.g. backend_stack), so only the project name syncs. Run supabase/projects.sql in the Supabase SQL editor, then reload.";
+
+// PostgREST answers PGRST204 when its schema cache lacks a column; Postgres itself says 42703.
+// Auth, RLS and network errors do not match, so they still surface as real failures.
+export function isMissingColumnError(error: DbError): boolean {
+  if (!error) return false;
+  return error.code === "PGRST204" || error.code === "42703" || /schema cache|could not find .*column/i.test(error.message);
+}
+
+// Once a missing column is seen, every later write goes out with the core columns only, so the same failing
+// payload is not sent (and rejected with a 400) again on each save. A reload resets this, e.g. after running the SQL.
+let schemaStale = false;
+export const isSchemaStale = () => schemaStale;
+
+// Runs a write with the full column set; on a missing-column error, retries once with the core columns
+// (workspace_id, name, identifier). Any other error is returned untouched.
+export async function withColumnFallback<T extends { error: DbError }>(run: (full: boolean) => PromiseLike<T>): Promise<T> {
+  if (schemaStale) return run(false);
+  const result = await run(true);
+  if (!isMissingColumnError(result.error)) return result;
+  schemaStale = true;
+  return run(false);
+}
+
 export const projectColumns = (p: ProjectRecord) => ({
   name: p.name,
   description: p.description || null,
@@ -327,9 +354,17 @@ export async function pushCloudProject(workspaceId: string, project: ProjectReco
     .eq("identifier", project.identifier)
     .maybeSingle();
   if (lookupError) throw new Error(lookupError.message);
-  const { error } = existing
-    ? await db.from("projects").update({ ...projectColumns(project), deleted_at: null }).eq("id", existing.id)
-    : await db.from("projects").insert({ workspace_id: workspaceId, identifier: project.identifier, ...projectColumns(project) });
+  const { error } = await withColumnFallback((full) =>
+    existing
+      ? db.from("projects").update(full ? { ...projectColumns(project), deleted_at: null } : { name: project.name, deleted_at: null }).eq("id", existing.id)
+      : db
+          .from("projects")
+          .insert(
+            full
+              ? { workspace_id: workspaceId, identifier: project.identifier, ...projectColumns(project) }
+              : { workspace_id: workspaceId, identifier: project.identifier, name: project.name }
+          )
+  );
   if (error) throw new Error(error.message);
 }
 

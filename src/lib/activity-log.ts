@@ -88,8 +88,8 @@ export function markActivitySeen(): void {
   notify();
 }
 
-export function useActivityLog(): { events: ActivityEvent[]; unread: number } {
+export function useActivityLog(): { events: ActivityEvent[]; unread: number; seenAt: number } {
   const events = useSyncExternalStore(subscribe, getEvents, () => EMPTY);
   const seenAt = useSyncExternalStore(subscribe, getSeenAt, () => 0);
-  return { events, unread: events.filter((e) => e.ts > seenAt).length };
+  return { events, unread: events.filter((e) => e.ts > seenAt).length, seenAt };
 }

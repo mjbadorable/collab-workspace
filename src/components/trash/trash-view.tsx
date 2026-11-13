@@ -204,11 +204,14 @@ function Trash({ workspaceId }: { workspaceId: string | null }) {
                 type="button"
                 aria-selected={active}
                 onClick={() => setFilter(f.value)}
-                className={`rounded-md px-2.5 py-1 text-sm ${
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm ${
                   active ? "bg-neutral-200 font-medium text-neutral-900" : "text-neutral-600 hover:bg-neutral-100"
                 }`}
               >
                 {f.label}
+                <span className="rounded-full bg-white px-1.5 text-xs tabular-nums text-neutral-500 ring-1 ring-neutral-200">
+                  {f.value === "all" ? list.length : list.filter((e) => e.kind === f.value).length}
+                </span>
               </button>
             );
           })}
@@ -229,7 +232,7 @@ function Trash({ workspaceId }: { workspaceId: string | null }) {
       {entries === null ? (
         <p className="mt-6 py-16 text-center text-sm text-neutral-500">Loading trash…</p>
       ) : visible.length === 0 ? (
-        <div className="mt-6 flex flex-col items-center rounded-lg border border-dashed border-neutral-300 px-6 py-16 text-center">
+        <div className="mt-6 flex flex-col items-center rounded-xl border border-dashed border-neutral-300 bg-white px-6 py-16 text-center">
           <Trash2 className="h-8 w-8 text-neutral-400" />
           {list.length === 0 ? (
             <>
@@ -244,7 +247,7 @@ function Trash({ workspaceId }: { workspaceId: string | null }) {
           )}
         </div>
       ) : (
-        <ul className="mt-4 divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+        <ul className="mt-4 divide-y divide-neutral-100 overflow-hidden rounded-xl border border-neutral-200 bg-white">
           {visible.map((entry) => {
             const { label, icon: Icon } = kindMeta[entry.kind];
             const name = entry.key ? `${entry.key} ${entry.title}` : entry.title;
@@ -253,7 +256,7 @@ function Trash({ workspaceId }: { workspaceId: string | null }) {
                 <Icon className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{name}</p>
-                  <p className="truncate text-xs text-neutral-500">
+                  <p className="truncate text-xs tabular-nums text-neutral-500">
                     {label} · {entry.projectName} · deleted {relativeTime(entry.deletedAt)}
                   </p>
                 </div>

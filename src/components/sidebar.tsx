@@ -15,18 +15,15 @@ import {
   Cog,
   Database,
   Home,
-  Keyboard,
+  Inbox,
   Landmark,
   Laptop,
   Layers,
   ListTodo,
-  Network,
-  LogOut,
-  Pencil,
   Moon,
+  Network,
   Plus,
   RefreshCw,
-  Search,
   Settings,
   Sun,
   Trash2,
@@ -37,23 +34,20 @@ import {
 import { useAuth } from "@/lib/auth-context";
 import { useWorkspaces } from "@/lib/workspace-context";
 import { useNewWorkItem } from "@/components/work-items/new-work-item-context";
-import ActivityBell from "@/components/activity-bell";
+import CollabLogo from "@/components/collab-logo";
 import EnvironmentSwitcher from "@/components/environment-switcher";
-import PokeballIcon from "@/components/pokeball-icon";
 import ProjectAvatar from "@/components/project-avatar";
-import Avatar from "@/components/settings/avatar";
+import { useActivityLog } from "@/lib/activity-log";
 import { mockWorkspace } from "@/lib/mock-data";
-import { roleTone, useProfile } from "@/lib/profile-context";
 import { useProjects } from "@/lib/projects-context";
 import { useTheme } from "@/lib/theme";
 import { useWorkspacePermissions } from "@/lib/use-permissions";
-import { useIsClient } from "@/lib/use-is-client";
 
-const primaryNav: { label: string; href: string; icon: LucideIcon }[] = [
+const workspaceNav: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Home", href: "/", icon: Home },
   { label: "Projects", href: "/projects", icon: Layers },
+  { label: "Inbox", href: "/inbox", icon: Inbox },
   { label: "Trash", href: "/trash", icon: Trash2 },
-  { label: "Settings", href: "/settings", icon: Settings },
 ];
 
 const categoryIcons: Record<"user" | "system" | "backend", LucideIcon> = { user: User, system: Cog, backend: Database };
@@ -61,78 +55,89 @@ const categoryIcons: Record<"user" | "system" | "backend", LucideIcon> = { user:
 // Everything a project offers; "diagrams" also expands into its three flow categories.
 const projectNav: { label: string; slug: string; icon: LucideIcon }[] = [
   { label: "Overview", slug: "", icon: BookOpen },
-  { label: "Work items", slug: "work-items", icon: ListTodo },
+  { label: "Work Items", slug: "work-items", icon: ListTodo },
   { label: "Cycles", slug: "cycles", icon: RefreshCw },
   { label: "Modules", slug: "modules", icon: Boxes },
   { label: "System Architecture", slug: "architecture", icon: Landmark },
-  { label: "Flowchart / Diagrams", slug: "diagrams", icon: Network },
+  { label: "Flowcharts / Diagrams", slug: "diagrams", icon: Network },
   { label: "Analytics", slug: "dashboards", icon: BarChart3 },
   { label: "Source Code", slug: "source", icon: Code2 },
-  { label: "Settings", slug: "settings", icon: Settings },
+  { label: "Project Settings", slug: "settings", icon: Settings },
 ];
 
-const itemClass =(active: boolean) =>
-  `flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
-    active ? "bg-neutral-200 font-medium text-neutral-900" : "text-neutral-600 hover:bg-neutral-100"
+// Burgundy sidebar: a translucent white pill marks the active page, with a thin amber edge.
+const itemClass = (active: boolean) =>
+  `flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
+    active ? "bg-white/15 font-medium text-white shadow-[inset_2px_0_0_#F59E0B]" : "text-white/75 hover:bg-white/10 hover:text-white"
   }`;
+
+const iconClass = (active: boolean) => `h-4 w-4 shrink-0 ${active ? "text-amber-300" : "text-white/55"}`;
+
+const sectionLabel = "px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/45";
+
+const menuItem = "flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-100";
 
 export default function Sidebar({
   onNavigate,
   onNewWorkspace,
   onInvite,
-  onEditProfile,
-  onSearch,
-  onShortcuts,
   onDeviceHandoff,
 }: {
   onNavigate?: () => void;
   onNewWorkspace: () => void;
   onInvite: () => void;
-  onEditProfile: () => void;
-  onSearch: () => void;
-  onShortcuts: () => void;
   onDeviceHandoff: () => void;
 }) {
   const pathname = usePathname();
   const activeCategory = useSearchParams().get("category") ?? "user";
   const router = useRouter();
   const { openDialog } = useNewWorkItem();
-  const [open, setOpen] = useState<Record<string, boolean>>({});
-  const { profile, displayName } = useProfile();
+  const [diagramsOpen, setDiagramsOpen] = useState<Record<string, boolean>>({});
   const { projects, currentProject, getProjectDiagrams, openCreateDialog } = useProjects();
+  const [pickedId, setPickedId] = useState<string | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const { user, loading, signOut } = useAuth();
-  const mounted = useIsClient();
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { workspaces, current, select } = useWorkspaces();
+  const { unread } = useActivityLog();
   // The server also rejects non-admin invites; hiding the menu item just avoids a dead end.
   const { isAdmin: canInvite } = useWorkspacePermissions(user && current ? current.id : null);
   const workspaceName = current?.name ?? mockWorkspace.name;
 
+  // The project whose pages are open; elsewhere, the one picked in the selector, else the first in the fleet order.
+  const active = currentProject ?? projects.find((p) => p.id === pickedId) ?? projects[0] ?? null;
+
   // Project sub-routes live under /projects/..., so "Projects" matches only its own page.
   const isActive = (href: string) => (href === "/" || href === "/projects" ? pathname === href : pathname.startsWith(href));
 
+  const pickProject = (id: string) => {
+    setPickedId(id);
+    setProjectMenuOpen(false);
+    onNavigate?.();
+    router.push(`/projects/${id}`);
+  };
+
   return (
-    <div className="flex h-full w-64 flex-col border-r border-neutral-200 bg-neutral-50">
-      <div className="space-y-2 p-3">
-        <div className="flex items-center gap-1">
-        <div className="relative min-w-0 flex-1">
+    <div className="flex h-full w-64 flex-col bg-[#0c0d10] bg-linear-to-b from-[#121317] to-[#090a0c] border-r border-white/10 text-neutral-100">
+      <div className="space-y-3 p-3">
+        <Link href="/" onClick={onNavigate} aria-label="Collab Workspace home" className="block rounded-md px-1 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400">
+          <CollabLogo variant="full" onDark className="h-9 w-9" />
+        </Link>
+
+        <div className="relative">
           <button
             type="button"
             aria-haspopup="menu"
             aria-expanded={switcherOpen}
             onClick={() => setSwitcherOpen((o) => !o)}
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-neutral-100"
+            className="flex w-full items-center gap-2 rounded-md bg-white/10 px-2.5 py-1.5 text-left text-sm hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
           >
-            <PokeballIcon className="h-6 w-6 shrink-0" />
-            <span className="flex-1 truncate text-sm font-medium">{workspaceName}</span>
-            <ChevronsUpDown className="h-4 w-4 text-neutral-400" />
+            <span className="flex-1 truncate font-medium">{workspaceName}</span>
+            <ChevronsUpDown className="h-4 w-4 text-white/55" aria-hidden />
           </button>
           {switcherOpen && (
-            <div
-              role="menu"
-              className="absolute inset-x-0 top-full z-10 mt-1 space-y-0.5 rounded-md border border-neutral-200 bg-white p-1 shadow-lg"
-            >
+            <div role="menu" className="absolute inset-x-0 top-full z-30 mt-1 space-y-0.5 rounded-md border border-neutral-200 bg-white p-1 text-neutral-900 shadow-lg">
               {user ? (
                 <>
                   {workspaces.map((w) => (
@@ -144,7 +149,7 @@ export default function Sidebar({
                         select(w.id);
                         setSwitcherOpen(false);
                       }}
-                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-neutral-100"
+                      className={menuItem}
                     >
                       <span className="flex-1 truncate">{w.name}</span>
                       {w.id === current?.id && <Check className="h-4 w-4 text-red-600" />}
@@ -158,7 +163,7 @@ export default function Sidebar({
                         setSwitcherOpen(false);
                         onInvite();
                       }}
-                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-600 hover:bg-neutral-100"
+                      className={menuItem}
                     >
                       <UserPlus className="h-4 w-4" /> Invite members
                     </button>
@@ -170,7 +175,7 @@ export default function Sidebar({
                       setSwitcherOpen(false);
                       onNewWorkspace();
                     }}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-600 hover:bg-neutral-100"
+                    className={menuItem}
                   >
                     <Plus className="h-4 w-4" /> New workspace
                   </button>
@@ -194,8 +199,6 @@ export default function Sidebar({
             </div>
           )}
         </div>
-        <ActivityBell />
-        </div>
 
         <button
           type="button"
@@ -203,58 +206,38 @@ export default function Sidebar({
             onNavigate?.();
             openDialog();
           }}
-          className="flex w-full items-center gap-2 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-700 shadow-sm hover:bg-neutral-100"
+          className="flex w-full items-center gap-2 rounded-md bg-amber-500 px-2.5 py-1.5 text-sm font-medium text-neutral-950 hover:bg-amber-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4" aria-hidden />
           <span className="flex-1 text-left">New work item</span>
-          <kbd className="rounded border border-neutral-200 bg-neutral-50 px-1.5 font-mono text-[10px] text-neutral-500">
-            C
-          </kbd>
+          <kbd className="rounded bg-black/15 px-1.5 font-mono text-[10px]">C</kbd>
         </button>
-
-        <button
-          type="button"
-          onClick={onSearch}
-          aria-label="Search and jump (Ctrl+K)"
-          className="flex w-full items-center gap-2 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-500 shadow-sm hover:bg-neutral-100"
-        >
-          <Search className="h-4 w-4" aria-hidden />
-          <span className="flex-1 text-left">Search &amp; jump…</span>
-          <kbd className="rounded border border-neutral-200 bg-neutral-50 px-1.5 font-mono text-[10px] text-neutral-500">Ctrl K</kbd>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            onNavigate?.();
-            onDeviceHandoff();
-          }}
-          title="Hand this session over to your other machine"
-          className="flex w-full items-center gap-2 rounded-md border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-700 shadow-sm hover:bg-neutral-100"
-        >
-          <Laptop className="h-4 w-4" aria-hidden />
-          <span className="flex-1 text-left">Device handoff</span>
-          <span aria-hidden>📡</span>
-        </button>
-
-        <EnvironmentSwitcher />
       </div>
 
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-3" aria-label="Main">
-        <ul className="space-y-0.5">
-          {primaryNav.map(({ label, href, icon: Icon }) => (
-            <li key={href}>
-              <Link href={href} onClick={onNavigate} className={itemClass(isActive(href))}>
-                <Icon className="h-4 w-4" />
-                {label}
-              </Link>
-            </li>
-          ))}
-        </ul>
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-3" aria-label="Main">
+        <div>
+          <p className={sectionLabel}>Workspace</p>
+          <ul className="space-y-0.5">
+            {workspaceNav.map(({ label, href, icon: Icon }) => (
+              <li key={href}>
+                <Link href={href} onClick={onNavigate} aria-current={isActive(href) ? "page" : undefined} className={itemClass(isActive(href))}>
+                  <Icon className={iconClass(isActive(href))} aria-hidden />
+                  <span className="flex-1">{label}</span>
+                  {href === "/inbox" && unread > 0 && (
+                    <span className="rounded-full bg-amber-500 px-1.5 text-[10px] font-semibold tabular-nums leading-4 text-neutral-950">
+                      <span className="sr-only">{unread} unread </span>
+                      {unread > 9 ? "9+" : unread}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <div>
-          <div className="flex items-center justify-between px-2.5 pb-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Projects</p>
+          <div className="flex items-center justify-between pr-1">
+            <p className={sectionLabel}>Active project</p>
             <button
               type="button"
               onClick={() => {
@@ -263,176 +246,134 @@ export default function Sidebar({
               }}
               aria-label="Create project"
               title="Create project"
-              className="rounded p-0.5 text-neutral-400 hover:bg-neutral-200 hover:text-red-600"
+              className="mb-1 rounded p-0.5 text-white/55 hover:bg-white/10 hover:text-amber-300"
             >
               <Plus className="h-4 w-4" aria-hidden />
             </button>
           </div>
-          <ul className="space-y-0.5">
-            {projects.map((project, index) => {
-              // An explicit toggle wins; otherwise the project you're in (or the first one) starts expanded.
-              const expanded = open[project.id] ?? (currentProject ? currentProject.id === project.id : index === 0);
-              const Chevron = expanded ? ChevronDown : ChevronRight;
-              return (
-                <li key={project.id}>
-                  <button
-                    type="button"
-                    aria-expanded={expanded}
-                    onClick={() => setOpen((s) => ({ ...s, [project.id]: !expanded }))}
-                    className={`${itemClass(false)} w-full`}
-                  >
-                    <Chevron className="h-4 w-4 shrink-0 text-neutral-400" />
-                    <ProjectAvatar project={project} className="h-5 w-5 text-[11px]" />
-                    <span className="truncate">{project.name}</span>
-                  </button>
-                  {expanded && (
-                    <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-neutral-200 pl-2">
-                      {projectNav.map((link) => {
-                        const href = `/projects/${project.id}${link.slug ? `/${link.slug}` : ""}`;
-                        const LinkIcon = link.icon;
-                        if (link.slug !== "diagrams") {
-                          return (
-                            <li key={link.slug || "overview"}>
-                              <Link href={href} onClick={onNavigate} className={itemClass(pathname === href)}>
-                                <LinkIcon className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-                                {link.label}
-                              </Link>
-                            </li>
-                          );
-                        }
-                        const diagramsKey = `${project.id}:diagrams`;
-                        const diagramsOpen = open[diagramsKey] ?? pathname === href;
-                        const DiagramChevron = diagramsOpen ? ChevronDown : ChevronRight;
-                        return (
-                          <li key={link.slug}>
-                            <div className="flex items-center">
-                              <Link href={href} onClick={onNavigate} className={`${itemClass(pathname === href)} flex-1`}>
-                                <LinkIcon className="h-3.5 w-3.5 text-neutral-400" aria-hidden />
-                                {link.label}
-                              </Link>
-                              <button
-                                type="button"
-                                aria-expanded={diagramsOpen}
-                                aria-label={`${diagramsOpen ? "Collapse" : "Expand"} diagrams`}
-                                onClick={() => setOpen((s) => ({ ...s, [diagramsKey]: !diagramsOpen }))}
-                                className="rounded p-1 text-neutral-400 hover:bg-neutral-200"
-                              >
-                                <DiagramChevron className="h-3.5 w-3.5" aria-hidden />
-                              </button>
-                            </div>
-                            {diagramsOpen && (
-                              <ul className="ml-3 mt-0.5 space-y-0.5 border-l border-neutral-200 pl-2">
-                                {getProjectDiagrams(project.id).map((d) => (
-                                  <li key={d.id}>
-                                    <Link href={d.href} onClick={onNavigate} className={itemClass(pathname === href && activeCategory === d.id)}>
-                                      {(() => {
-                                        const CategoryIcon = categoryIcons[d.id];
-                                        return <CategoryIcon className="h-3.5 w-3.5 text-neutral-400" aria-hidden />;
-                                      })()}
-                                      <span className="truncate">{d.name}</span>
-                                    </Link>
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+
+          {active ? (
+            <>
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded={projectMenuOpen}
+                  onClick={() => setProjectMenuOpen((o) => !o)}
+                  className="flex w-full items-center gap-2 rounded-md bg-white/10 px-2 py-1.5 text-left text-sm hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                >
+                  <ProjectAvatar project={active} className="h-6 w-6 text-xs" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{active.name}</span>
+                    <span className="block font-mono text-[10px] text-white/50">{active.identifier}</span>
+                  </span>
+                  <ChevronsUpDown className="h-4 w-4 shrink-0 text-white/55" aria-hidden />
+                </button>
+                {projectMenuOpen && (
+                  <div role="menu" className="absolute inset-x-0 top-full z-30 mt-1 max-h-64 space-y-0.5 overflow-y-auto rounded-md border border-neutral-200 bg-white p-1 text-neutral-900 shadow-lg">
+                    {projects.map((p) => (
+                      <button key={p.id} type="button" role="menuitemradio" aria-checked={p.id === active.id} onClick={() => pickProject(p.id)} className={menuItem}>
+                        <ProjectAvatar project={p} className="h-5 w-5 text-[10px]" />
+                        <span className="flex-1 truncate">{p.name}</span>
+                        {p.id === active.id && <Check className="h-4 w-4 text-red-600" aria-hidden />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <ul className="mt-2 space-y-0.5">
+                {projectNav.map((link) => {
+                  const href = `/projects/${active.id}${link.slug ? `/${link.slug}` : ""}`;
+                  const LinkIcon = link.icon;
+                  const here = pathname === href;
+                  if (link.slug !== "diagrams") {
+                    return (
+                      <li key={link.slug || "overview"}>
+                        <Link href={href} onClick={onNavigate} aria-current={here ? "page" : undefined} className={itemClass(here)}>
+                          <LinkIcon className={iconClass(here)} aria-hidden />
+                          {link.label}
+                        </Link>
+                      </li>
+                    );
+                  }
+                  const diagramsKey = `${active.id}:diagrams`;
+                  const expanded = diagramsOpen[diagramsKey] ?? here;
+                  const DiagramChevron = expanded ? ChevronDown : ChevronRight;
+                  return (
+                    <li key={link.slug}>
+                      <div className="flex items-center gap-0.5">
+                        <Link href={href} onClick={onNavigate} aria-current={here ? "page" : undefined} className={`${itemClass(here)} min-w-0 flex-1`}>
+                          <LinkIcon className={iconClass(here)} aria-hidden />
+                          <span className="truncate">{link.label}</span>
+                        </Link>
+                        <button
+                          type="button"
+                          aria-expanded={expanded}
+                          aria-label={`${expanded ? "Collapse" : "Expand"} diagrams`}
+                          onClick={() => setDiagramsOpen((s) => ({ ...s, [diagramsKey]: !expanded }))}
+                          className="rounded p-1 text-white/55 hover:bg-white/10 hover:text-white"
+                        >
+                          <DiagramChevron className="h-3.5 w-3.5" aria-hidden />
+                        </button>
+                      </div>
+                      {expanded && (
+                        <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-white/15 pl-2">
+                          {getProjectDiagrams(active.id).map((d) => {
+                            const CategoryIcon = categoryIcons[d.id];
+                            const on = here && activeCategory === d.id;
+                            return (
+                              <li key={d.id}>
+                                <Link href={d.href} onClick={onNavigate} className={itemClass(on)}>
+                                  <CategoryIcon className={iconClass(on)} aria-hidden />
+                                  <span className="truncate">{d.name}</span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          ) : (
+            <p className="px-2.5 text-xs text-white/55">No projects yet.</p>
+          )}
         </div>
       </nav>
 
-      <div className="border-t border-neutral-200 p-3">
-        {!mounted || loading ? (
-          <div className="h-12" aria-hidden />
-        ) : (
-          <div>
-            {/* Row 1: who you are. Nothing else shares this row, so the full name and role always fit. */}
-            <div className="flex items-center gap-2.5 px-1 py-1">
-              <button
-                type="button"
-                onClick={() => {
-                  onNavigate?.();
-                  onEditProfile();
-                }}
-                aria-label="Edit profile"
-                className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
-              >
-                <Avatar url={profile.avatar_url} name={displayName} />
-              </button>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold" title={user?.email ?? displayName}>
-                  {displayName}
-                </p>
-                <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-neutral-500">
-                  <span className={`shrink-0 whitespace-nowrap rounded px-1 text-[10px] font-semibold uppercase ${roleTone(profile.role)}`}>
-                    {profile.role}
-                  </span>
-                  <span className="min-w-0 truncate">{user ? "Signed in" : "Local preview"} · Admin</span>
-                </p>
-              </div>
-            </div>
-            {/* Row 2: quick utilities. */}
-            <div className="mt-2 grid grid-cols-4 gap-1 rounded-lg border border-neutral-200 bg-white p-1">
-            <button
-              type="button"
-              onClick={() => {
-                onNavigate?.();
-                onEditProfile();
-              }}
-              title="Edit profile"
-              aria-label="Edit profile"
-              className="flex items-center justify-center rounded py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onNavigate?.();
-                onShortcuts();
-              }}
-              title="Keyboard shortcuts (?)"
-              aria-label="Keyboard shortcuts"
-              className="flex items-center justify-center rounded py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
-            >
-              <Keyboard className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={toggleTheme}
-              title="Switch between Poké-Center Light and Silph Co. Dark"
-              aria-label="Switch between Poké-Center Light and Silph Co. Dark"
-              className="flex items-center justify-center rounded py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
-            >
-              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </button>
-            {user ? (
-              <button
-                type="button"
-                onClick={async () => {
-                  await signOut();
-                  router.push("/login");
-                }}
-                title="Sign out"
-                aria-label="Sign out"
-                className="flex items-center justify-center rounded py-1 text-xs text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
-              >
-                <LogOut className="h-4 w-4" />
-              </button>
-            ) : (
-              <Link href="/login" onClick={onNavigate} className="flex items-center justify-center rounded py-1 text-xs font-medium text-red-600 hover:bg-neutral-100">
-                Sign in
-              </Link>
-            )}
-            </div>
-          </div>
-        )}
+      <div className="space-y-2 border-t border-white/10 p-3">
+        <EnvironmentSwitcher />
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate?.();
+            onDeviceHandoff();
+          }}
+          title="Hand this session over to your other machine"
+          className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-white/75 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <Laptop className="h-4 w-4 text-white/55" aria-hidden />
+          <span className="flex-1 text-left">Device handoff</span>
+          <span aria-hidden>📡</span>
+        </button>
+        <div className="flex items-center gap-1">
+          <Link href="/settings" onClick={onNavigate} aria-current={pathname === "/settings" ? "page" : undefined} className={`${itemClass(pathname === "/settings")} flex-1`}>
+            <Settings className={iconClass(pathname === "/settings")} aria-hidden />
+            Settings
+          </Link>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            title="Switch between Poké-Center Light and Silph Co. Dark"
+            aria-label="Switch between Poké-Center Light and Silph Co. Dark"
+            className="rounded-md p-2 text-white/75 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
+        </div>
       </div>
     </div>
   );

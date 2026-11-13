@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import Link from "next/link";
 import { Plus, RefreshCw } from "lucide-react";
 import { metaFromParsed, parseDescription, serializeDescription } from "@/lib/checklist";
 import {
@@ -74,7 +73,7 @@ function ProgressBar({ items }: { items: StoredWorkItem[] }) {
       >
         <div className="h-full rounded-full bg-linear-to-r from-red-500 to-amber-400" style={{ width: `${percent}%` }} />
       </div>
-      <p className="mt-1 text-xs text-neutral-500">
+      <p className="mt-1 text-xs tabular-nums text-neutral-500">
         {done}/{total} tasks completed · {percent}%
       </p>
     </div>
@@ -190,7 +189,7 @@ function CycleCard({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="text-sm font-semibold">{cycle.name}</h3>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs tabular-nums text-neutral-500">
               {formatRange(cycle)}
               {cycle.description && ` · ${cycle.description}`}
             </p>
@@ -374,7 +373,7 @@ function Planner({ projectId, api }: { projectId: string; api: Api }) {
             }`}
           >
             {t.label}
-            <span className="rounded-full bg-neutral-100 px-1.5 text-xs text-neutral-500">{cycles.filter((c) => c.status === t.value).length}</span>
+            <span className="rounded-full bg-neutral-100 px-1.5 text-xs tabular-nums text-neutral-500">{cycles.filter((c) => c.status === t.value).length}</span>
           </button>
         ))}
       </div>
@@ -382,7 +381,7 @@ function Planner({ projectId, api }: { projectId: string; api: Api }) {
       {api.items === null ? (
         <p className="py-8 text-center text-sm text-neutral-500">Loading work items…</p>
       ) : inTab.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-neutral-300 px-6 py-10 text-center text-sm text-neutral-500">
+        <p className="rounded-xl border border-dashed border-neutral-300 px-6 py-10 text-center text-sm text-neutral-500">
           No {tab} cycles.
         </p>
       ) : (
@@ -446,13 +445,6 @@ export default function CyclesView({ projectId }: { projectId: string }) {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
-      <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-1.5 text-sm text-neutral-500">
-        <Link href="/projects" className="hover:text-neutral-900">Projects</Link>
-        <span aria-hidden>›</span>
-        <Link href={`/projects/${project.id}`} className="hover:text-neutral-900">{project.name}</Link>
-        <span aria-hidden>›</span>
-        <span className="text-neutral-900">Cycles</span>
-      </nav>
       <h1 className="mb-1 text-xl font-semibold">Cycles</h1>
       <p className="mb-6 text-sm text-neutral-500">Plan sprints and track progress cycle by cycle.</p>
       {/* Remounted per project so the cycle list never shows another project's data. */}

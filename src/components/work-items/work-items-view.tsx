@@ -1,11 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowUpDown,
-  ChevronRight,
   GitCommitHorizontal as GitCommit,
   GitPullRequest,
   Kanban,
@@ -14,6 +12,7 @@ import {
   Pencil,
   Plus,
   Search,
+  SlidersHorizontal,
   Trash2,
   X,
   type LucideIcon,
@@ -1145,6 +1144,50 @@ function ItemForm({
   );
 }
 
+// Label, cycle, priority, assignee and blocked filters live in one popover, so the toolbar stays a single clean row.
+function FilterMenu({ activeCount, children }: { activeCount: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="true"
+        onClick={() => setOpen((o) => !o)}
+        className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm ${
+          activeCount > 0 ? "border-indigo-300 bg-indigo-50 font-medium text-indigo-700" : "border-neutral-300 text-neutral-600 hover:bg-neutral-100"
+        }`}
+      >
+        <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden /> Filters
+        {activeCount > 0 && <span className="rounded-full bg-indigo-600 px-1.5 text-[11px] font-semibold tabular-nums text-white">{activeCount}</span>}
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-20 mt-1 flex w-64 flex-col items-stretch gap-2 rounded-lg border border-neutral-200 bg-white p-3 shadow-xl [&_select]:w-full [&_select]:max-w-none">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId: string | null }) {
   const { user } = useAuth();
   const { displayName, profile } = useProfile();
@@ -1314,6 +1357,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
     blockedOnly ||
     sortOrder !== "oldest" ||
     filter !== "all";
+  const activeFilterCount = [labelFilter !== "all", cycleFilter !== "all", priorityFilter !== "all", assigneeFilter !== "all", blockedOnly].filter(Boolean).length;
   const clearFilters = () => {
     setSortOrder("oldest");
     setQuery("");
@@ -1327,19 +1371,14 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
   const visible = filter === "all" ? live : live.filter((i) => i.status === filter);
   const count = (f: Filter) => (f === "all" ? live.length : live.filter((i) => i.status === f).length);
   const projectRecord = getProjects().find((p) => p.id === projectId);
-  const projectName = projectRecord?.name ?? projectId;
   const githubUrl = projectRecord?.github_url ?? "";
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-[calc(100dvh-13rem)] min-h-[32rem] flex-col">
       <header className="flex items-center justify-between gap-4 border-b border-neutral-200 px-4 py-2 text-sm">
-        <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1 text-neutral-500">
-          <Link href="/projects" className="hover:text-neutral-900">Projects</Link>
-          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{projectName}</span>
-          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-          <span className="font-medium text-neutral-900">Work items</span>
-        </nav>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
+          Work items <span className="rounded-full bg-neutral-100 px-2 text-xs font-medium tabular-nums text-neutral-600">{live.length}</span>
+        </h2>
         <div className="flex shrink-0 items-center gap-3">
           <PresenceAvatars viewers={teammates} />
           <LiveStatusBadge cloud={workspaceId !== null} status={realtimeStatus} />
@@ -1424,6 +1463,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
             className="w-48 rounded-md border border-neutral-300 bg-white py-1 pl-7 pr-2 text-sm outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
           />
         </div>
+        <FilterMenu activeCount={activeFilterCount}>
         <select
           value={labelFilter}
           onChange={(e) => setLabelFilter(WORK_ITEM_LABELS.find((l) => l === e.target.value) ?? "all")}
@@ -1490,6 +1530,7 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
         >
           ⛔ Blocked
         </button>
+        </FilterMenu>
         <select
           value={sortOrder}
           onChange={(e) => setSortOrder(SORT_OPTIONS.find((o) => o.value === e.target.value)?.value ?? "oldest")}
@@ -1617,14 +1658,14 @@ function WorkItems({ projectId, workspaceId }: { projectId: string; workspaceId:
         ref={editDialogRef}
         onClose={() => setEditingItem(null)}
         onClick={(e) => e.target === e.currentTarget && setEditingItem(null)}
-        aria-label="Edit Work Item"
-        className="m-auto w-full max-w-md rounded-xl border border-neutral-200 p-0 shadow-xl backdrop:bg-black/30"
+        aria-label="Task details"
+        className="drawer-panel ml-auto mr-0 mt-0 mb-0 h-dvh max-h-dvh w-full max-w-lg overflow-y-auto rounded-none border-0 border-l border-neutral-200 p-0 shadow-2xl backdrop:bg-black/30"
       >
         {editingItem && (
           <ItemForm
             key={editingItem.id}
             projectKey={workItemKey(projectId, editingItem.seq)}
-            heading="Edit Work Item"
+            heading={`Task details · ${workItemKey(projectId, editingItem.seq)}`}
             submitLabel="Save changes"
             initial={editingItem}
             people={people}
